@@ -83,7 +83,7 @@ func (p *Plugin) commandAdd(ctx context.Context, args *model.CommandArgs, title 
 		p.client.Log.Error("Task command failed", "error", err.Error())
 		return ephemeral("Something went wrong adding the task.")
 	}
-	p.publishTaskChanged("created", t.ChannelID, t.ID)
+	p.emit("created", args.UserId, t)
 	return ephemeral(fmt.Sprintf("Added task **%s**. Open the Tasks panel to set a due date or assign it.", escapeMarkdown(t.Title)))
 }
 

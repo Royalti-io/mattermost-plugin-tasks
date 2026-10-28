@@ -142,7 +142,7 @@ func (p *Plugin) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	status := http.StatusCreated
 	if created {
-		p.publishTaskChanged("created", t.ChannelID, t.ID)
+		p.emit("created", callerID(r), t)
 		if in.NotifyThread && in.PostID != "" {
 			p.replyTaskCreated(r, in.PostID, t)
 		}
@@ -184,7 +184,7 @@ func (p *Plugin) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.publishTaskChanged("updated", t.ChannelID, t.ID)
+	p.emit("updated", callerID(r), updated)
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -212,7 +212,7 @@ func (p *Plugin) MoveTask(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.publishTaskChanged("moved", t.ChannelID, t.ID)
+	p.emit("moved", callerID(r), moved)
 	writeJSON(w, http.StatusOK, moved)
 }
 
@@ -225,7 +225,7 @@ func (p *Plugin) DeleteTask(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.publishTaskChanged("deleted", t.ChannelID, t.ID)
+	p.emit("deleted", callerID(r), t)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -337,7 +337,7 @@ func (p *Plugin) AddChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.publishTaskChanged("updated", t.ChannelID, t.ID)
+	p.emitByID("updated", callerID(r), t.ChannelID, t.ID)
 	writeJSON(w, http.StatusCreated, item)
 }
 
@@ -364,7 +364,7 @@ func (p *Plugin) UpdateChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.publishTaskChanged("updated", t.ChannelID, t.ID)
+	p.emitByID("updated", callerID(r), t.ChannelID, t.ID)
 	writeJSON(w, http.StatusOK, item)
 }
 
@@ -377,7 +377,7 @@ func (p *Plugin) DeleteChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.publishTaskChanged("updated", t.ChannelID, t.ID)
+	p.emitByID("updated", callerID(r), t.ChannelID, t.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

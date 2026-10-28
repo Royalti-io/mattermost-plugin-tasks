@@ -24,6 +24,12 @@ type configuration struct {
 
 	// DisableReminders stops the scheduled reminder and digest job.
 	DisableReminders bool
+
+	// WebhookURL receives a signed POST for every task change. Empty disables it.
+	WebhookURL string
+
+	// WebhookSecret signs webhook bodies (HMAC-SHA256 in X-Tasks-Signature).
+	WebhookSecret string
 }
 
 // Clone shallow copies the configuration. Your implementation may require a deep copy if
@@ -84,6 +90,11 @@ func (p *Plugin) OnConfigurationChange() error {
 	}
 
 	p.setConfiguration(configuration)
+
+	// Called before OnActivate at server start, when the sender does not exist yet.
+	if p.webhooks != nil {
+		p.webhooks.Configure(configuration.WebhookURL, configuration.WebhookSecret)
+	}
 
 	return nil
 }

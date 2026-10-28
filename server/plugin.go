@@ -26,6 +26,9 @@ type Plugin struct {
 	// client is the Mattermost server API client.
 	client *pluginapi.Client
 
+	// webhooks delivers task events to the configured URL.
+	webhooks *webhookSender
+
 	// botID is the user id of the plugin's "tasks" bot, which posts thread replies.
 	botID string
 
@@ -48,6 +51,10 @@ type Plugin struct {
 // OnActivate is invoked when the plugin is activated. If an error is returned, the plugin will be deactivated.
 func (p *Plugin) OnActivate() error {
 	p.client = pluginapi.NewClient(p.API, p.Driver)
+
+	p.webhooks = newWebhookSender(func(msg string, kv ...any) { p.client.Log.Warn(msg, kv...) })
+	cfg := p.getConfiguration()
+	p.webhooks.Configure(cfg.WebhookURL, cfg.WebhookSecret)
 
 	p.kvstore = kvstore.NewKVStore(p.client)
 
@@ -95,6 +102,9 @@ func (p *Plugin) OnActivate() error {
 
 // OnDeactivate is invoked when the plugin is deactivated.
 func (p *Plugin) OnDeactivate() error {
+	if p.webhooks != nil {
+		p.webhooks.Close()
+	}
 	if p.backgroundJob != nil {
 		if err := p.backgroundJob.Close(); err != nil {
 			p.API.LogError("Failed to close background job", "err", err)

@@ -35,6 +35,20 @@
                 "type": "bool",
                 "help_text": "Stops the scheduled due-date reminders and daily digests. Manual runs by an administrator still work.",
                 "default": false
+            },
+            {
+                "key": "WebhookURL",
+                "display_name": "Webhook URL",
+                "type": "text",
+                "help_text": "Receives a signed JSON POST for every task change (created, updated, moved, deleted). Leave empty to disable. See docs/api.md.",
+                "default": ""
+            },
+            {
+                "key": "WebhookSecret",
+                "display_name": "Webhook secret",
+                "type": "text",
+                "help_text": "Used to sign webhook bodies: the X-Tasks-Signature header is sha256=HMAC-SHA256(secret, body). Use a long random string.",
+                "default": ""
             }
         ]
     }

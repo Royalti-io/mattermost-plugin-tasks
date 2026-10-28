@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/Royalti-io/mattermost-plugin-tasks/server/command"
 	"github.com/Royalti-io/mattermost-plugin-tasks/server/store/kvstore"
+	"github.com/Royalti-io/mattermost-plugin-tasks/server/store/sqlstore"
 )
 
 // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
@@ -28,6 +30,9 @@ type Plugin struct {
 
 	// commandClient is the client used to register and execute slash commands.
 	commandClient command.Command
+
+	// tasks persists tasks in the plugin's own Postgres tables.
+	tasks *sqlstore.Store
 
 	// router is the HTTP router for handling API requests.
 	router *mux.Router
@@ -49,6 +54,17 @@ func (p *Plugin) OnActivate() error {
 	p.kvstore = kvstore.NewKVStore(p.client)
 
 	p.commandClient = command.NewCommandHandler(p.client)
+
+	db, err := p.client.Store.GetMasterDB()
+	if err != nil {
+		return errors.Wrap(err, "failed to get database handle")
+	}
+	p.tasks = sqlstore.New(db)
+	migrateCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err = p.tasks.Migrate(migrateCtx); err != nil {
+		return errors.Wrap(err, "failed to migrate task tables")
+	}
 
 	p.router = p.initRouter()
 

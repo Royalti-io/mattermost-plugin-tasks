@@ -29,6 +29,16 @@ func (p *Plugin) initRouter() *mux.Router {
 	apiRouter.HandleFunc("/hello", p.HelloWorld).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/access", p.Access).Methods(http.MethodGet)
 
+	apiRouter.HandleFunc("/tasks", p.ListTasks).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/tasks", p.CreateTask).Methods(http.MethodPost)
+	apiRouter.HandleFunc("/tasks/{id}", p.GetTask).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/tasks/{id}", p.UpdateTask).Methods(http.MethodPatch)
+	apiRouter.HandleFunc("/tasks/{id}", p.DeleteTask).Methods(http.MethodDelete)
+	apiRouter.HandleFunc("/tasks/{id}/move", p.MoveTask).Methods(http.MethodPost)
+	apiRouter.HandleFunc("/tasks/{id}/checklist", p.AddChecklistItem).Methods(http.MethodPost)
+	apiRouter.HandleFunc("/tasks/{id}/checklist/{item}", p.UpdateChecklistItem).Methods(http.MethodPatch)
+	apiRouter.HandleFunc("/tasks/{id}/checklist/{item}", p.DeleteChecklistItem).Methods(http.MethodDelete)
+
 	return router
 }
 

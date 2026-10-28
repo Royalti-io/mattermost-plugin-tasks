@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/pluginapi/testhelper"
@@ -179,6 +181,80 @@ func TestTasksAPI(t *testing.T) {
 
 		require.Equal(t, http.StatusNoContent, call(t, th, memberClient, http.MethodDelete, p, nil, nil))
 		assert.Equal(t, http.StatusNotFound, call(t, th, memberClient, http.MethodGet, p, nil, nil))
+	})
+
+	t.Run("creating from a post replies in its thread", func(t *testing.T) {
+		post := th.PostAs(member, chID, "the login page is broken on mobile")
+		var task tasks.Task
+		code := call(t, th, memberClient, http.MethodPost, "/tasks", map[string]any{
+			"channel_id": chID, "title": "Fix mobile login", "post_id": post.Id, "notify_thread": true,
+		}, &task)
+		require.Equal(t, http.StatusCreated, code)
+		assert.Equal(t, post.Id, task.PostID)
+
+		thread, _, err := memberClient.GetPostThread(ctx, post.Id, "", false)
+		require.NoError(t, err)
+		var replies []string
+		for _, id := range thread.Order {
+			if pp := thread.Posts[id]; pp.Id != post.Id {
+				replies = append(replies, pp.Message)
+			}
+		}
+		require.Len(t, replies, 1)
+		assert.Contains(t, replies[0], "Fix mobile login")
+		assert.Contains(t, replies[0], "@"+member.Username)
+
+		// A post from another channel is refused.
+		code = call(t, th, memberClient, http.MethodPost, "/tasks", map[string]any{
+			"channel_id": chID, "title": "wrong channel", "post_id": th.PostAs(th.AdminUser, secret.Id, "elsewhere").Id,
+		}, nil)
+		assert.Equal(t, http.StatusBadRequest, code)
+	})
+
+	t.Run("task changes are pushed over the websocket to channel members only", func(t *testing.T) {
+		wsURL := strings.Replace(th.ServerURL, "http", "ws", 1)
+		ws, err := model.NewWebSocketClient4(wsURL, memberClient.AuthToken)
+		require.NoError(t, err)
+		ws.Listen()
+		defer ws.Close()
+
+		// `other` is on the team but not in the channel; they must hear nothing.
+		outsider, err := model.NewWebSocketClient4(wsURL, otherClient.AuthToken)
+		require.NoError(t, err)
+		outsider.Listen()
+		defer outsider.Close()
+
+		var task tasks.Task
+		require.Equal(t, http.StatusCreated, call(t, th, memberClient, http.MethodPost, "/tasks", map[string]any{"channel_id": chID, "title": "ws check"}, &task))
+
+		want := "custom_" + testhelper.PluginID() + "_task_changed"
+		deadline := time.After(10 * time.Second)
+		for {
+			select {
+			case ev := <-ws.EventChannel:
+				if ev == nil || string(ev.EventType()) != want {
+					continue
+				}
+				data := ev.GetData()
+				assert.Equal(t, "created", data["action"])
+				assert.Equal(t, task.ID, data["task_id"])
+				assert.Equal(t, chID, data["channel_id"])
+
+				quiet := time.After(2 * time.Second)
+				for {
+					select {
+					case oe := <-outsider.EventChannel:
+						if oe != nil {
+							assert.NotEqual(t, want, string(oe.EventType()), "non-members must not receive task events")
+						}
+					case <-quiet:
+						return
+					}
+				}
+			case <-deadline:
+				t.Fatal("no task_changed websocket event received")
+			}
+		}
 	})
 
 	t.Run("archived channels are read-only", func(t *testing.T) {

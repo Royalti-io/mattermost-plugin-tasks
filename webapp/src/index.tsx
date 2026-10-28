@@ -1,13 +1,20 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {setStore} from 'bridge';
 import manifest from 'manifest';
 import React from 'react';
 import type {Store} from 'redux';
+import {notifyTasksChanged} from 'taskEvents';
 
 import type {GlobalState} from '@mattermost/types/store';
 
+import CreateFromPostModal, {openCreateFromPost} from 'components/CreateFromPostModal';
+import TasksPanel from 'components/TasksPanel';
+
 import type {PluginRegistry} from 'types/mattermost-webapp';
+
+import 'styles.scss';
 
 const apiBase = `/plugins/${manifest.id}/api/v1`;
 
@@ -25,13 +32,6 @@ async function uiEnabled(): Promise<boolean> {
         return false;
     }
 }
-
-const TasksPanel = () => (
-    <div style={{padding: '16px'}}>
-        <h3>{'Tasks'}</h3>
-        <p>{'Development build. Nothing here yet.'}</p>
-    </div>
-);
 
 const TasksIcon = () => (
     <svg
@@ -61,6 +61,8 @@ export default class Plugin {
                 return;
             }
 
+            setStore(_store);
+
             const {toggleRHSPlugin} = registry.registerRightHandSidebarComponent(TasksPanel, 'Tasks');
             registry.registerChannelHeaderButtonAction(
                 <TasksIcon/>,
@@ -68,6 +70,18 @@ export default class Plugin {
                 'Tasks',
                 'Tasks',
             );
+
+            registry.registerPostDropdownMenuAction({
+                text: 'Create task',
+
+                // Mattermost calls the action with the post id; the typings omit it.
+                action: ((postId: string) => openCreateFromPost(postId)) as unknown as () => void,
+                filter: () => true,
+            });
+            registry.registerRootComponent(CreateFromPostModal);
+
+            // The server publishes "custom_<plugin id>_task_changed" to channel members.
+            registry.registerWebSocketEventHandler(`custom_${manifest.id}_task_changed`, () => notifyTasksChanged());
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error(`[${manifest.id}] failed to initialize`, err);

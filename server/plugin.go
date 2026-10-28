@@ -31,6 +31,9 @@ type Plugin struct {
 	// commandClient is the client used to register and execute slash commands.
 	commandClient command.Command
 
+	// botID is the user id of the plugin's "tasks" bot, which posts thread replies.
+	botID string
+
 	// tasks persists tasks in the plugin's own Postgres tables.
 	tasks *sqlstore.Store
 
@@ -54,6 +57,16 @@ func (p *Plugin) OnActivate() error {
 	p.kvstore = kvstore.NewKVStore(p.client)
 
 	p.commandClient = command.NewCommandHandler(p.client)
+
+	botID, err := p.client.Bot.EnsureBot(&model.Bot{
+		Username:    "tasks",
+		DisplayName: "Tasks",
+		Description: "Posts updates from the Tasks plugin.",
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to ensure tasks bot")
+	}
+	p.botID = botID
 
 	db, err := p.client.Store.GetMasterDB()
 	if err != nil {

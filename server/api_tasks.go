@@ -140,7 +140,12 @@ func (p *Plugin) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := http.StatusCreated
-	if !created {
+	if created {
+		p.publishTaskChanged("created", t.ChannelID, t.ID)
+		if in.NotifyThread && in.PostID != "" {
+			p.replyTaskCreated(r, in.PostID, t)
+		}
+	} else {
 		status = http.StatusOK
 	}
 	writeJSON(w, status, t)
@@ -178,6 +183,7 @@ func (p *Plugin) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
+	p.publishTaskChanged("updated", t.ChannelID, t.ID)
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -205,6 +211,7 @@ func (p *Plugin) MoveTask(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
+	p.publishTaskChanged("moved", t.ChannelID, t.ID)
 	writeJSON(w, http.StatusOK, moved)
 }
 
@@ -217,6 +224,7 @@ func (p *Plugin) DeleteTask(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
+	p.publishTaskChanged("deleted", t.ChannelID, t.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -328,6 +336,7 @@ func (p *Plugin) AddChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
+	p.publishTaskChanged("updated", t.ChannelID, t.ID)
 	writeJSON(w, http.StatusCreated, item)
 }
 
@@ -354,6 +363,7 @@ func (p *Plugin) UpdateChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
+	p.publishTaskChanged("updated", t.ChannelID, t.ID)
 	writeJSON(w, http.StatusOK, item)
 }
 
@@ -366,5 +376,34 @@ func (p *Plugin) DeleteChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
+	p.publishTaskChanged("updated", t.ChannelID, t.ID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// replyTaskCreated leaves a note in the source post's thread so people see that
+// the message became a task. Failure is logged, never returned: the task exists.
+func (p *Plugin) replyTaskCreated(r *http.Request, postID string, t *tasks.Task) {
+	log := requestLogger(r)
+	post, err := p.client.Post.GetPost(postID)
+	if err != nil {
+		log.WithError(err).Warnf("Cannot load source post for task reply")
+		return
+	}
+	root := post.RootId
+	if root == "" {
+		root = post.Id
+	}
+	username := callerID(r)
+	if u, uerr := p.client.User.Get(callerID(r)); uerr == nil {
+		username = u.Username
+	}
+	reply := &model.Post{
+		ChannelId: t.ChannelID,
+		RootId:    root,
+		UserId:    p.botID,
+		Message:   fmt.Sprintf(":white_check_mark: @%s created a task from this message: **%s**", username, t.Title),
+	}
+	if err = p.client.Post.CreatePost(reply); err != nil {
+		log.WithError(err).Warnf("Cannot post task reply")
+	}
 }

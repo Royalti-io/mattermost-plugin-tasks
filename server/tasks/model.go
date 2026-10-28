@@ -90,6 +90,9 @@ type CreateInput struct {
 	PostID      string   `json:"post_id"`
 	Source      string   `json:"source"`
 	ExternalID  string   `json:"external_id"`
+
+	// NotifyThread asks the plugin to reply in the source post's thread (needs PostID).
+	NotifyThread bool `json:"notify_thread"`
 }
 
 // OptionalInt64 distinguishes "field absent" from "field set to null" in a PATCH body.

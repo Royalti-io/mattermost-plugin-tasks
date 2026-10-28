@@ -82,7 +82,7 @@ func TestFormatReminders(t *testing.T) {
 	due := time.Date(2026, 10, 28, 23, 59, 59, 0, loc).UnixMilli()
 
 	msg := formatReminders(loc,
-		[]reminderItem{{Title: "Pay [vendor]", ChannelName: "Ops", Link: "https://mm/x", DueAt: due}},
+		[]reminderItem{{Title: "Pay [vendor]", ChannelName: "~Ops", Link: "https://mm/x", DueAt: due}},
 		[]reminderItem{{Title: "Ship", Link: "https://mm/tasks-board", DueAt: due}},
 	)
 

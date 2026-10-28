@@ -69,7 +69,8 @@ func digestDue(local time.Time, lastDate string) (bool, string) {
 }
 
 type reminderItem struct {
-	Title       string
+	Title string
+	// ChannelName is ready to print: "~channel" or "a direct message".
 	ChannelName string
 	Link        string
 	DueAt       int64
@@ -83,7 +84,7 @@ func formatItems(b *strings.Builder, items []reminderItem, loc *time.Location, l
 	for _, it := range items {
 		fmt.Fprintf(b, "- [**%s**](%s)", escapeMarkdown(it.Title), it.Link)
 		if it.ChannelName != "" {
-			fmt.Fprintf(b, " in ~%s", it.ChannelName)
+			fmt.Fprintf(b, " in %s", it.ChannelName)
 		}
 		fmt.Fprintf(b, " · %s %s\n", label, formatDue(it.DueAt, loc))
 	}
@@ -172,9 +173,9 @@ func (p *Plugin) channelName(id string) string {
 		return "a direct message"
 	}
 	if ch.DisplayName != "" {
-		return ch.DisplayName
+		return "~" + ch.DisplayName
 	}
-	return ch.Name
+	return "~" + ch.Name
 }
 
 // canNotify reports whether a user should hear about tasks in a channel: it must be

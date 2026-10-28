@@ -351,3 +351,106 @@ func TestChecklist(t *testing.T) {
 	_, err = s.AddChecklistItem(ctx, task.ID, "one too many")
 	assert.ErrorIs(t, err, ErrLimit)
 }
+
+func TestDueForReminderSelection(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	const hour = int64(60 * 60 * 1000)
+	now := nowMillis()
+	win, maxAge := 24*hour, 7*24*hour
+
+	at := func(d int64) *int64 { v := now + d; return &v }
+	soon := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "soon", DueAt: at(2 * hour), Assignees: []string{"ann", "bob"}})
+	late := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "late", DueAt: at(-2 * hour), Assignees: []string{"ann"}, PostID: "p1"})
+	mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "far off", DueAt: at(3 * 24 * hour), Assignees: []string{"ann"}})
+	mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "ancient", DueAt: at(-30 * 24 * hour), Assignees: []string{"ann"}})
+	mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "no due date", Assignees: []string{"ann"}})
+	mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "no assignee", DueAt: at(hour)})
+	mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "already done", DueAt: at(hour), Assignees: []string{"ann"}, Status: tasks.StatusDone})
+	gone := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "deleted", DueAt: at(hour), Assignees: []string{"ann"}})
+	require.NoError(t, s.Delete(ctx, gone.ID))
+
+	got, err := s.DueForReminder(ctx, now, win, maxAge)
+	require.NoError(t, err)
+
+	type key struct{ task, user, kind string }
+	have := map[key]ReminderCandidate{}
+	for _, c := range got {
+		have[key{c.TaskID, c.UserID, c.Kind}] = c
+	}
+	assert.Len(t, got, 3, "only soon (x2 assignees) and late qualify")
+	assert.Contains(t, have, key{soon.ID, "ann", KindDueSoon})
+	assert.Contains(t, have, key{soon.ID, "bob", KindDueSoon})
+	assert.Contains(t, have, key{late.ID, "ann", KindOverdue})
+	assert.Equal(t, "p1", have[key{late.ID, "ann", KindOverdue}].PostID)
+	assert.Equal(t, "c", have[key{soon.ID, "ann", KindDueSoon}].ChannelID)
+}
+
+func TestReminderClaimsAreExactlyOnceAndRearmOnNewDueDate(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	const hour = int64(60 * 60 * 1000)
+	now := nowMillis()
+	due := now + hour
+	task := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "t", DueAt: &due, Assignees: []string{"ann"}})
+
+	pending := func() int {
+		got, err := s.DueForReminder(ctx, now, 24*hour, 7*24*hour)
+		require.NoError(t, err)
+		return len(got)
+	}
+	require.Equal(t, 1, pending())
+
+	cand := ReminderCandidate{TaskID: task.ID, UserID: "ann", Kind: KindDueSoon, DueAt: due}
+	ok, err := s.ClaimReminder(ctx, cand)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	ok, err = s.ClaimReminder(ctx, cand)
+	require.NoError(t, err)
+	assert.False(t, ok, "a second claim loses")
+	assert.Equal(t, 0, pending(), "a claimed reminder is no longer offered")
+
+	// Concurrent claims: exactly one winner.
+	other := ReminderCandidate{TaskID: task.ID, UserID: "bob", Kind: KindDueSoon, DueAt: due}
+	var wg sync.WaitGroup
+	var winners atomic.Int64
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if won, cerr := s.ClaimReminder(ctx, other); cerr == nil && won {
+				winners.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	assert.Equal(t, int64(1), winners.Load())
+
+	// A failed send releases the claim so it is retried.
+	require.NoError(t, s.ReleaseReminder(ctx, cand))
+	assert.Equal(t, 1, pending())
+
+	// Moving the due date re-arms the reminder.
+	_, err = s.ClaimReminder(ctx, cand)
+	require.NoError(t, err)
+	require.Equal(t, 0, pending())
+	newDue := due + 2*hour
+	_, err = s.Update(ctx, task.ID, tasks.Patch{DueAt: tasks.OptionalInt64{Set: true, Value: &newDue}})
+	require.NoError(t, err)
+	assert.Equal(t, 1, pending(), "a new due date is a new reminder")
+}
+
+func TestReminderStateIsRemovedWithItsTask(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	due := nowMillis() + 1000
+	task := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "t", DueAt: &due, Assignees: []string{"ann"}})
+	_, err := s.ClaimReminder(ctx, ReminderCandidate{TaskID: task.ID, UserID: "ann", Kind: KindDueSoon, DueAt: due})
+	require.NoError(t, err)
+
+	_, err = s.db.Exec(`DELETE FROM rt_tasks_task WHERE id = $1`, task.ID)
+	require.NoError(t, err)
+	var n int
+	require.NoError(t, s.db.QueryRow(`SELECT COUNT(*) FROM rt_tasks_reminder_state`).Scan(&n))
+	assert.Equal(t, 0, n)
+}

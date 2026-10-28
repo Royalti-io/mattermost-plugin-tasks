@@ -62,6 +62,21 @@ var migrations = []migration{
 			`CREATE INDEX IF NOT EXISTS idx_rt_tasks_checklist_task ON rt_tasks_checklist_item (task_id, position)`,
 		},
 	},
+	{
+		version: 2,
+		statements: []string{
+			// One row per reminder already sent. due_at is part of the key so moving a
+			// task's due date re-arms its reminders.
+			`CREATE TABLE IF NOT EXISTS rt_tasks_reminder_state (
+				task_id VARCHAR(26) NOT NULL REFERENCES rt_tasks_task(id) ON DELETE CASCADE,
+				user_id VARCHAR(26) NOT NULL,
+				kind    VARCHAR(16) NOT NULL,
+				due_at  BIGINT      NOT NULL,
+				sent_at BIGINT      NOT NULL,
+				PRIMARY KEY (task_id, user_id, kind, due_at)
+			)`,
+		},
+	},
 }
 
 // Migrate applies any pending migrations. It is safe to call from several

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"net/http"
 	"sync"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi/cluster"
 	"github.com/pkg/errors"
 
-	"github.com/Royalti-io/mattermost-plugin-tasks/server/command"
 	"github.com/Royalti-io/mattermost-plugin-tasks/server/store/kvstore"
 	"github.com/Royalti-io/mattermost-plugin-tasks/server/store/sqlstore"
 )
@@ -27,9 +25,6 @@ type Plugin struct {
 
 	// client is the Mattermost server API client.
 	client *pluginapi.Client
-
-	// commandClient is the client used to register and execute slash commands.
-	commandClient command.Command
 
 	// botID is the user id of the plugin's "tasks" bot, which posts thread replies.
 	botID string
@@ -56,7 +51,9 @@ func (p *Plugin) OnActivate() error {
 
 	p.kvstore = kvstore.NewKVStore(p.client)
 
-	p.commandClient = command.NewCommandHandler(p.client)
+	if err := p.registerCommand(); err != nil {
+		return errors.Wrap(err, "failed to register the /task command")
+	}
 
 	botID, err := p.client.Bot.EnsureBot(&model.Bot{
 		Username:    "tasks",
@@ -83,8 +80,8 @@ func (p *Plugin) OnActivate() error {
 
 	job, err := cluster.Schedule(
 		p.API,
-		"BackgroundJob",
-		cluster.MakeWaitForRoundedInterval(1*time.Hour),
+		"ReminderJob",
+		cluster.MakeWaitForRoundedInterval(reminderInterval),
 		p.runJob,
 	)
 	if err != nil {
@@ -104,15 +101,6 @@ func (p *Plugin) OnDeactivate() error {
 		}
 	}
 	return nil
-}
-
-// This will execute the commands that were registered in the NewCommandHandler function.
-func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*model.CommandResponse, *model.AppError) {
-	response, err := p.commandClient.Handle(args)
-	if err != nil {
-		return nil, model.NewAppError("ExecuteCommand", "plugin.command.execute_command.app_error", nil, err.Error(), http.StatusInternalServerError)
-	}
-	return response, nil
 }
 
 // See https://developers.mattermost.com/extend/plugins/server/reference/

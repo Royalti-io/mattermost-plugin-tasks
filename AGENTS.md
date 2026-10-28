@@ -8,12 +8,11 @@ While iterating, run the narrow command; both `make test` and `make check-style`
 
 ```bash
 SKIP_DOCKER_TESTS=1 go test ./server/...       # server unit tests only
-go test ./server/command -run TestHelloCommand # single test
+go test ./server/tasks -run TestPatchNormalize  # single test
 cd webapp && npx jest src/manifest.test.tsx    # single webapp test
 go vet ./... && golangci-lint run ./...        # server lint
 cd webapp && npm run lint && npm run check-types
 make test                                      # full check before pushing
-make mock                                      # regenerate server/command/mocks after changing command.Command
 ```
 
 `make help` lists the remaining targets (deploy, watch, release bumps, debugger attach).

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/mattermost/mattermost/server/public/model"
@@ -406,4 +407,30 @@ func (p *Plugin) replyTaskCreated(r *http.Request, postID string, t *tasks.Task)
 	if err = p.client.Post.CreatePost(reply); err != nil {
 		log.WithError(err).Warnf("Cannot post task reply")
 	}
+}
+
+type runRemindersResponse struct {
+	Reminders int `json:"reminders_sent"`
+	Digests   int `json:"digests_sent"`
+}
+
+// RunReminders runs the reminder and digest job once, for system admins. It is the
+// manual trigger for operations and for integration tests.
+func (p *Plugin) RunReminders(w http.ResponseWriter, r *http.Request) {
+	if !p.client.User.HasPermissionTo(callerID(r), model.PermissionManageSystem) {
+		writeError(w, http.StatusForbidden, "system administrators only")
+		return
+	}
+	ctx := r.Context()
+	reminders, err := p.runReminders(ctx)
+	if err != nil {
+		p.storeError(w, r, err)
+		return
+	}
+	digests, err := p.runDigests(ctx, time.Now())
+	if err != nil {
+		p.storeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, runRemindersResponse{Reminders: reminders, Digests: digests})
 }

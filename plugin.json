@@ -28,6 +28,13 @@
                 "type": "text",
                 "help_text": "Comma-separated usernames who see the Tasks UI. Empty means nobody. Used to limit exposure while the plugin is in development.",
                 "default": "chinedumokerengwor"
+            },
+            {
+                "key": "DisableReminders",
+                "display_name": "Disable reminders",
+                "type": "bool",
+                "help_text": "Stops the scheduled due-date reminders and daily digests. Manual runs by an administrator still work.",
+                "default": false
             }
         ]
     }

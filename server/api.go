@@ -39,6 +39,8 @@ func (p *Plugin) initRouter() *mux.Router {
 	apiRouter.HandleFunc("/tasks/{id}/checklist/{item}", p.UpdateChecklistItem).Methods(http.MethodPatch)
 	apiRouter.HandleFunc("/tasks/{id}/checklist/{item}", p.DeleteChecklistItem).Methods(http.MethodDelete)
 
+	apiRouter.HandleFunc("/admin/run-reminders", p.RunReminders).Methods(http.MethodPost)
+
 	return router
 }
 

@@ -21,6 +21,9 @@ type configuration struct {
 	// UIAllowlist is a comma-separated list of usernames who see the plugin UI.
 	// Empty means nobody.
 	UIAllowlist string
+
+	// DisableReminders stops the scheduled reminder and digest job.
+	DisableReminders bool
 }
 
 // Clone shallow copies the configuration. Your implementation may require a deep copy if

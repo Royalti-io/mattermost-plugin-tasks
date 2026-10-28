@@ -267,3 +267,143 @@
     font-size: 12px;
     font-weight: 600;
 }
+
+// Board
+.rt-board {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    padding: 16px 24px;
+    background: var(--center-channel-bg);
+    color: var(--center-channel-color);
+    font-size: 14px;
+
+    &__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    &__title {
+        margin: 0 8px 0 0;
+        font-size: 22px;
+    }
+
+    &__ctl {
+        flex: 0 1 220px;
+    }
+
+    &__error {
+        flex: none;
+    }
+
+    &__cols {
+        display: flex;
+        flex: 1;
+        gap: 12px;
+        min-height: 0;
+        overflow-x: auto;
+        padding-bottom: 8px;
+    }
+}
+
+.rt-col {
+    display: flex;
+    flex: 0 0 280px;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    padding: 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: rgba(var(--center-channel-color-rgb), 0.04);
+
+    &--over {
+        border-color: var(--button-bg);
+    }
+
+    &__head {
+        display: flex;
+        justify-content: space-between;
+        font-weight: 600;
+    }
+
+    &__count {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+    }
+
+    &__list {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 48px;
+        overflow-y: auto;
+    }
+
+    &__empty {
+        padding: 12px 0;
+        color: rgba(var(--center-channel-color-rgb), 0.48);
+        font-size: 12px;
+        text-align: center;
+    }
+
+    &__more,
+    &__addbtn {
+        align-self: flex-start;
+    }
+}
+
+.rt-card {
+    padding: 8px 10px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+    border-radius: 6px;
+    background: var(--center-channel-bg);
+    cursor: grab;
+
+    &:focus-visible {
+        outline: 2px solid var(--button-bg);
+    }
+
+    &--dragging {
+        opacity: 0.4;
+    }
+
+    &__title {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    &__meta {
+        margin: 4px 0 0;
+    }
+}
+
+.rt-drop {
+    flex: none;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--button-bg);
+}
+
+.rt-modal {
+    &--wide {
+        width: min(560px, calc(100vw - 32px));
+        max-height: calc(100vh - 64px);
+        overflow-y: auto;
+    }
+
+    &__bar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+}
+
+.rt-panel__top {
+    display: flex;
+    justify-content: flex-end;
+}

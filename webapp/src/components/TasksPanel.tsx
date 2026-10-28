@@ -1,5 +1,6 @@
 import {api} from 'api';
 import {useTasks} from 'hooks';
+import {openBoard} from 'navigation';
 import React, {useEffect, useState} from 'react';
 import {useSelector} from 'react-redux';
 import {OPEN_STATUSES} from 'taskTypes';
@@ -78,6 +79,13 @@ export default function TasksPanel() {
 
     return (
         <div className='rt-panel'>
+            <div className='rt-panel__top'>
+                <button
+                    type='button'
+                    className='rt-link'
+                    onClick={openBoard}
+                >{'Open board'}</button>
+            </div>
             <div
                 className='rt-segment'
                 role='tablist'

@@ -3,12 +3,14 @@
 
 import {setStore} from 'bridge';
 import manifest from 'manifest';
+import {BOARD_PATH} from 'navigation';
 import React from 'react';
 import type {Store} from 'redux';
 import {notifyTasksChanged} from 'taskEvents';
 
 import type {GlobalState} from '@mattermost/types/store';
 
+import BoardPage from 'components/BoardPage';
 import CreateFromPostModal, {openCreateFromPost} from 'components/CreateFromPostModal';
 import TasksPanel from 'components/TasksPanel';
 
@@ -54,6 +56,8 @@ const TasksIcon = () => (
     </svg>
 );
 
+const BoardHeader = () => <span style={{fontWeight: 600}}>{'Tasks'}</span>;
+
 export default class Plugin {
     public async initialize(registry: PluginRegistry, _store: Store<GlobalState>) {
         try {
@@ -85,6 +89,22 @@ export default class Plugin {
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error(`[${manifest.id}] failed to initialize`, err);
+        }
+
+        // Registered on its own so a problem with the full-page board cannot take the panel down with it.
+        try {
+            registry.registerProduct({
+                baseURL: BOARD_PATH,
+                switcherIcon: 'product-checklists',
+                switcherText: 'Tasks',
+                switcherLinkURL: BOARD_PATH,
+                mainComponent: BoardPage,
+                headerCentreComponent: BoardHeader,
+                showTeamSidebar: false,
+            });
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error(`[${manifest.id}] failed to register the board`, err);
         }
     }
 }

@@ -1,0 +1,26 @@
+{
+    "id": "com.royalti.tasks",
+    "name": "Tasks",
+    "description": "Channel-scoped tasks with a Kanban board, reminders and an API for bots and agents.",
+    "homepage_url": "https://github.com/Royalti-io/mattermost-plugin-tasks",
+    "support_url": "https://github.com/Royalti-io/mattermost-plugin-tasks/issues",
+    "icon_path": "assets/tasks-icon.svg",
+    "min_server_version": "12.0.0",
+    "server": {
+        "executables": {
+            "linux-amd64": "server/dist/plugin-linux-amd64",
+            "linux-arm64": "server/dist/plugin-linux-arm64",
+            "darwin-amd64": "server/dist/plugin-darwin-amd64",
+            "darwin-arm64": "server/dist/plugin-darwin-arm64",
+            "windows-amd64": "server/dist/plugin-windows-amd64.exe"
+        }
+    },
+    "webapp": {
+        "bundle_path": "webapp/dist/main.js"
+    },
+    "settings_schema": {
+        "header": "",
+        "footer": "",
+        "settings": []
+    }
+}

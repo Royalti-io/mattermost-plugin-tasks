@@ -25,9 +25,7 @@ const config = {
         }],
         ['@emotion/babel-preset-css-prop'],
     ],
-    plugins: [
-        'babel-plugin-typescript-to-proptypes',
-    ],
+    plugins: [],
 };
 
 // Jest needs module transformation

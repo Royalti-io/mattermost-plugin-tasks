@@ -21,6 +21,14 @@
     "settings_schema": {
         "header": "",
         "footer": "",
-        "settings": []
+        "settings": [
+            {
+                "key": "UIAllowlist",
+                "display_name": "UI allowlist (usernames)",
+                "type": "text",
+                "help_text": "Comma-separated usernames who see the Tasks UI. Empty means nobody. Used to limit exposure while the plugin is in development.",
+                "default": "chinedumokerengwor"
+            }
+        ]
     }
 }

@@ -25,6 +25,7 @@ describe('dueInfo', () => {
         const past = dateInputToDueAt('2026-10-20');
         expect(dueInfo(past, false, now)).toMatchObject({overdue: true, text: '8 days overdue'});
         expect(dueInfo(past, true, now)?.overdue).toBe(false);
+        expect(dueInfo(past, true, now)?.text).not.toMatch(/overdue/);
     });
 
     it('is not soon for a far-off date', () => {

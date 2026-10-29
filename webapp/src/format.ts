@@ -19,7 +19,7 @@ export function dueInfo(dueAt: number | null, done: boolean, now: number = Date.
         text = 'Due tomorrow';
     } else if (days === -1) {
         text = 'Due yesterday';
-    } else if (days < 0) {
+    } else if (days < 0 && !done) {
         text = `${-days} days overdue`;
     } else {
         text = `Due ${date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}`;

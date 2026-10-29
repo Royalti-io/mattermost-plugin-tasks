@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 - 2026-10-29
 
 First public version.
 
@@ -9,3 +9,5 @@ First public version.
 - Right-hand panel, Kanban board, create from a message, live updates.
 - Reminders, opt-in daily digest, `/task` command.
 - REST API, idempotent create for integrations, signed webhooks.
+- Completed tasks show their due date instead of an "overdue" count.
+- Original plugin icon and README screenshots.

@@ -22,6 +22,14 @@ plugin's own tables in your Mattermost Postgres database.
 Access follows channels: you can see a task if you can read its channel, and change
 it if you can post there. Private channels stay private.
 
+## Screenshots
+
+![The Tasks panel in the right-hand sidebar](docs/screenshots/panel.png)
+
+![The Kanban board](docs/screenshots/board.png)
+
+![The create-a-task dialog, opened from the sidebar plus menu](docs/screenshots/create-dialog.png)
+
 ## Requirements
 
 - Mattermost **12.0 or later** (the web app is built for React 19).

@@ -270,3 +270,36 @@ func TestTasksAPI(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, call(t, th, memberClient, http.MethodPatch, "/tasks/"+task.ID, map[string]any{"title": "edit"}, nil))
 	})
 }
+
+// The web app's assignee picker searches Mattermost's user autocomplete scoped to the
+// task's channel. This pins the contract it relies on: channel members come back in
+// `users`, everyone else is `out_of_channel`, and a person picked from `users` is accepted.
+func TestAssigneePickerContract(t *testing.T) {
+	th := testhelper.Setup(t)
+	ctx := t.Context()
+
+	teammate := th.CreateUser()
+	outsider := th.CreateUser()
+	_, _, err := th.AdminClient.AddChannelMember(ctx, th.Channel.Id, teammate.Id)
+	require.NoError(t, err)
+
+	// Both new users share the "user-" prefix, so one search shows who is in and who is out.
+	res, _, err := th.Client.AutocompleteUsersInChannel(ctx, th.Team.Id, th.Channel.Id, "user-", 10, "")
+	require.NoError(t, err)
+
+	var in, out []string
+	for _, u := range res.Users {
+		in = append(in, u.Id)
+	}
+	for _, u := range res.OutOfChannel {
+		out = append(out, u.Id)
+	}
+	assert.Contains(t, in, teammate.Id)
+	assert.NotContains(t, in, outsider.Id, "non-members are not suggested as assignees")
+	assert.Contains(t, out, outsider.Id)
+
+	var task tasks.Task
+	require.Equal(t, http.StatusCreated, call(t, th, th.Client, http.MethodPost, "/tasks", map[string]any{"channel_id": th.Channel.Id, "title": "pick me"}, &task))
+	assert.Equal(t, http.StatusOK, call(t, th, th.Client, http.MethodPatch, "/tasks/"+task.ID, map[string]any{"assignees": []string{teammate.Id}}, nil), "someone from `users` is accepted")
+	assert.Equal(t, http.StatusBadRequest, call(t, th, th.Client, http.MethodPatch, "/tasks/"+task.ID, map[string]any{"assignees": []string{outsider.Id}}, nil), "someone from `out_of_channel` is refused")
+}

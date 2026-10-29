@@ -19,6 +19,7 @@ jest.mock('api', () => ({
         updateChecklistItem: jest.fn(),
         deleteChecklistItem: jest.fn(),
     },
+    userApi: {autocomplete: jest.fn().mockResolvedValue([]), byIds: jest.fn().mockResolvedValue([])},
 }));
 
 const state = {

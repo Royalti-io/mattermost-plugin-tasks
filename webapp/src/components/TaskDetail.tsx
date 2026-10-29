@@ -6,6 +6,8 @@ import React, {useState} from 'react';
 import {PRIORITIES, STATUSES} from 'taskTypes';
 import type {Priority, Status, Task} from 'taskTypes';
 
+import AssigneePicker from './AssigneePicker';
+
 type Props = {
     task: Task;
     currentUserId: string;
@@ -71,10 +73,10 @@ export default function TaskDetail({task, currentUserId, replace, reload, onErro
         reload();
     };
 
-    const assignedToMe = task.assignees.includes(currentUserId);
-    const toggleAssignMe = () => patch({
-        assignees: assignedToMe ? task.assignees.filter((a) => a !== currentUserId) : [...task.assignees, currentUserId],
-    });
+    const setAssignees = (next: string[]) => {
+        replace({...task, assignees: next});
+        patch({assignees: next});
+    };
 
     return (
         <div className='rt-detail'>
@@ -145,14 +147,15 @@ export default function TaskDetail({task, currentUserId, replace, reload, onErro
                     />
                 </label>
             </div>
-            <label className='rt-inline'>
-                <input
-                    type='checkbox'
-                    checked={assignedToMe}
-                    onChange={toggleAssignMe}
+            <div className='rt-field'>
+                {'Assignees'}
+                <AssigneePicker
+                    channelId={task.channel_id}
+                    assignees={task.assignees}
+                    currentUserId={currentUserId}
+                    onChange={setAssignees}
                 />
-                {'Assigned to me'}
-            </label>
+            </div>
             <ul className='rt-checklist'>
                 {task.checklist.map((c) => (
                     <li key={c.id}>

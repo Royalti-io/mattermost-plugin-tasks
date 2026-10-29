@@ -2,6 +2,7 @@ import manifest from 'manifest';
 import type {ChecklistItem, Priority, Status, Task} from 'taskTypes';
 
 const base = `/plugins/${manifest.id}/api/v1`;
+const coreBase = '/api/v4';
 
 export class ApiError extends Error {
     status: number;
@@ -28,7 +29,7 @@ export function buildQuery(params: Record<string, string | number | undefined>):
     return s ? `?${s}` : '';
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, prefix: string = base): Promise<T> {
     const headers: Record<string, string> = {'X-Requested-With': 'XMLHttpRequest'};
     if (method !== 'GET') {
         headers['X-CSRF-Token'] = csrfToken();
@@ -37,7 +38,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         headers['Content-Type'] = 'application/json';
     }
 
-    const resp = await fetch(base + path, {
+    const resp = await fetch(prefix + path, {
         method,
         headers,
         credentials: 'same-origin',
@@ -106,4 +107,26 @@ export const api = {
     updateChecklistItem: (taskId: string, itemId: string, patch: {text?: string; done?: boolean}) =>
         request<ChecklistItem>('PATCH', `/tasks/${taskId}/checklist/${itemId}`, patch),
     deleteChecklistItem: (taskId: string, itemId: string) => request<void>('DELETE', `/tasks/${taskId}/checklist/${itemId}`),
+};
+
+// The slice of a Mattermost user the picker needs.
+export type MMUser = {
+    id: string;
+    username: string;
+    first_name?: string;
+    last_name?: string;
+    nickname?: string;
+    is_bot?: boolean;
+};
+
+// Mattermost's own user API, used to find and name assignees.
+export const userApi = {
+
+    // Members of a channel whose name starts with `name`. Assignees must be channel members.
+    async autocomplete(name: string, channelId: string, teamId?: string): Promise<MMUser[]> {
+        const q = buildQuery({in_channel: channelId, in_team: teamId, name, limit: 10});
+        const res = await request<{users?: MMUser[]}>('GET', '/users/autocomplete' + q, undefined, coreBase);
+        return res.users || [];
+    },
+    byIds: (ids: string[]) => request<MMUser[]>('POST', '/users/ids', ids, coreBase),
 };

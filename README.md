@@ -6,7 +6,8 @@ plugin's own tables in your Mattermost Postgres database.
 
 - **List panel** in the right-hand sidebar: this channel, assigned to me, or all your
   channels; search and status filter; quick add; complete with a click; edit title,
-  description, priority, due date and checklist inline.
+  description, priority, due date, assignees and checklist inline. Assignees are picked
+  from the task's channel members.
 - **Kanban board** at `/tasks-board`: five columns (Backlog, To do, In progress,
   Blocked, Done), drag and drop, quick add per column.
 - **Create from a message**: post menu → *Create task*. The task links back to the
@@ -71,8 +72,6 @@ User preferences (the digest setting) live in the plugin's key-value store.
 
 - Statuses are fixed (Backlog, To do, In progress, Blocked, Done). Custom columns are
   planned.
-- The web UI can assign a task to yourself; assigning to others is done through the
-  API for now.
 - No file attachments, recurring tasks or time tracking.
 - Many repeated drops between the same two cards eventually run out of float
   precision and fall back to ordering by age.

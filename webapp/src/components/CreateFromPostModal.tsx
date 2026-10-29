@@ -10,6 +10,8 @@ import type {Priority} from 'taskTypes';
 
 import type {GlobalState} from '@mattermost/types/store';
 
+import AssigneePicker from './AssigneePicker';
+
 type Prefill = {postId: string; channelId: string; title: string; description: string};
 
 let current: Prefill | null = null;
@@ -68,7 +70,7 @@ function ModalBody({prefill}: {prefill: Prefill}) {
     const [title, setTitle] = useState(prefill.title);
     const [priority, setPriority] = useState<Priority>('normal');
     const [due, setDue] = useState('');
-    const [assignMe, setAssignMe] = useState(true);
+    const [assignees, setAssignees] = useState<string[]>([currentUserId]);
     const [notify, setNotify] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -98,7 +100,7 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                 description: prefill.description,
                 priority,
                 due_at: dateInputToDueAt(due),
-                assignees: assignMe ? [currentUserId] : [],
+                assignees,
                 post_id: prefill.postId,
                 notify_thread: notify,
             });
@@ -167,14 +169,15 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                         />
                     </label>
                 </div>
-                <label className='rt-inline'>
-                    <input
-                        type='checkbox'
-                        checked={assignMe}
-                        onChange={(e) => setAssignMe(e.target.checked)}
+                <div className='rt-field'>
+                    {'Assignees'}
+                    <AssigneePicker
+                        channelId={prefill.channelId}
+                        assignees={assignees}
+                        currentUserId={currentUserId}
+                        onChange={setAssignees}
                     />
-                    {'Assign to me'}
-                </label>
+                </div>
                 <label className='rt-inline'>
                     <input
                         type='checkbox'

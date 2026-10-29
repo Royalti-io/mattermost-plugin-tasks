@@ -4,6 +4,7 @@ import {openBoard} from 'navigation';
 import React, {useEffect, useState} from 'react';
 import {useSelector} from 'react-redux';
 import {OPEN_STATUSES} from 'taskTypes';
+import {useUserNames} from 'userNames';
 
 import type {GlobalState} from '@mattermost/types/store';
 
@@ -22,7 +23,6 @@ export default function TasksPanel() {
     const currentUserId = useSelector((s: GlobalState) => s.entities.users.currentUserId);
     const channelId = useSelector((s: GlobalState) => s.entities.channels.currentChannelId);
     const channels = useSelector((s: GlobalState) => s.entities.channels.channels);
-    const profiles = useSelector((s: GlobalState) => s.entities.users.profiles);
 
     const [scope, setScope] = useState<Scope>('channel');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
@@ -50,7 +50,7 @@ export default function TasksPanel() {
         const ch = channels[id];
         return ch ? (ch.display_name || ch.name) : undefined;
     };
-    const userName = (id: string) => profiles[id]?.username || id.slice(0, 6);
+    const userName = useUserNames(tasks.flatMap((t) => t.assignees));
 
     const addTask = async () => {
         const t = title.trim();

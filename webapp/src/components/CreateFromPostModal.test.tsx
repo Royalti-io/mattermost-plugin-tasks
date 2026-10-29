@@ -11,10 +11,18 @@ import type {GlobalState} from '@mattermost/types/store';
 
 import CreateFromPostModal, {openCreateFromPost} from './CreateFromPostModal';
 
-jest.mock('api', () => ({api: {createTask: jest.fn()}}));
+jest.mock('api', () => ({
+    api: {createTask: jest.fn()},
+    userApi: {autocomplete: jest.fn().mockResolvedValue([]), byIds: jest.fn().mockResolvedValue([])},
+}));
 
 jest.mock('react-redux', () => ({
-    useSelector: (fn: (s: unknown) => unknown) => fn({entities: {users: {currentUserId: 'u1'}}}),
+    useSelector: (fn: (s: unknown) => unknown) => fn({
+        entities: {
+            users: {currentUserId: 'u1', profiles: {u1: {username: 'ada'}}},
+            teams: {currentTeamId: 't1'},
+        },
+    }),
 }));
 
 const mocked = api as jest.Mocked<typeof api>;
@@ -66,13 +74,13 @@ describe('CreateFromPostModal', () => {
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
 
-    it('lets the user opt out of assignment and the thread reply', async () => {
+    it('lets the user drop the default assignee and skip the thread reply', async () => {
         mocked.createTask.mockResolvedValue({} as never);
         render(<CreateFromPostModal/>);
         act(() => openCreateFromPost('p1'));
         await screen.findByRole('dialog');
 
-        fireEvent.click(screen.getByLabelText('Assign to me'));
+        fireEvent.click(screen.getByLabelText('Remove @ada'));
         fireEvent.click(screen.getByLabelText('Reply in the thread'));
         fireEvent.click(screen.getByText('Create task'));
 

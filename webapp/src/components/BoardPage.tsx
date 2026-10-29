@@ -7,6 +7,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSelector} from 'react-redux';
 import {STATUSES} from 'taskTypes';
 import type {Status, Task} from 'taskTypes';
+import {useUserNames} from 'userNames';
 
 import type {GlobalState} from '@mattermost/types/store';
 
@@ -41,7 +42,6 @@ export default function BoardPage() {
     const currentChannelId = useSelector((s: GlobalState) => s.entities.channels.currentChannelId);
     const channels = useSelector((s: GlobalState) => s.entities.channels.channels);
     const myMembers = useSelector((s: GlobalState) => s.entities.channels.myMembers);
-    const profiles = useSelector((s: GlobalState) => s.entities.users.profiles);
 
     // Public and private channels the user belongs to; DMs have no useful name to pick by.
     const channelOptions = useMemo(() => Object.values(channels).
@@ -95,7 +95,7 @@ export default function BoardPage() {
         const c = channels[id];
         return c ? (c.display_name || c.name) : undefined;
     };
-    const userName = (id: string) => profiles[id]?.username || id.slice(0, 6);
+    const userName = useUserNames(tasks.flatMap((t) => t.assignees));
 
     const changeScope = (next: Scope) => {
         setScope(next);

@@ -89,9 +89,10 @@ export default function BoardPage() {
     const groups = useMemo(() => groupByStatus(tasks), [tasks]);
     const selected = selectedId ? tasks.find((t) => t.id === selectedId) : undefined;
 
+    // Names come from the choices too, so they are there when the page was opened directly.
     const channelLabel = (id: string) => {
         const c = channels[id];
-        return c ? (c.display_name || c.name) : undefined;
+        return c ? (c.display_name || c.name) : channelOptions.find((o) => o.id === id)?.name;
     };
     const userName = useUserNames(tasks.flatMap((t) => t.assignees));
 

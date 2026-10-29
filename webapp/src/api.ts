@@ -110,6 +110,8 @@ export const api = {
 };
 
 // The slice of a Mattermost user the picker needs.
+export type MMChannel = {id: string; type: string; name: string; display_name: string; delete_at: number};
+
 export type MMUser = {
     id: string;
     username: string;
@@ -129,4 +131,8 @@ export const userApi = {
         return res.users || [];
     },
     byIds: (ids: string[]) => request<MMUser[]>('POST', '/users/ids', ids, coreBase),
+
+    // Every channel the user belongs to, across teams. Used when the page was opened
+    // directly (no team in the URL), so Mattermost has not loaded any channels yet.
+    myChannels: () => request<MMChannel[]>('GET', '/users/me/channels', undefined, coreBase),
 };

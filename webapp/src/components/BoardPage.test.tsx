@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import {createEvent, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
-import {api} from 'api';
+import {api, userApi} from 'api';
 import React from 'react';
 import type {Task} from 'taskTypes';
 
@@ -19,7 +19,7 @@ jest.mock('api', () => ({
         updateChecklistItem: jest.fn(),
         deleteChecklistItem: jest.fn(),
     },
-    userApi: {autocomplete: jest.fn().mockResolvedValue([]), byIds: jest.fn().mockResolvedValue([])},
+    userApi: {autocomplete: jest.fn().mockResolvedValue([]), byIds: jest.fn().mockResolvedValue([]), myChannels: jest.fn().mockResolvedValue([])},
 }));
 
 const state = {
@@ -120,6 +120,27 @@ describe('BoardPage', () => {
         await screen.findByText('write');
         const options = within(screen.getByLabelText('Channel')).getAllByRole('option').map((o) => o.textContent);
         expect(options).toEqual(['~General', '~Ops']);
+    });
+
+    it('loads the user\'s channels when the page is opened directly and the store has none', async () => {
+        const saved = state.entities.channels;
+        state.entities.channels = {currentChannelId: '', channels: {}, myMembers: {}} as unknown as typeof saved;
+        (userApi.myChannels as jest.Mock).mockResolvedValue([
+            {id: 'c2', type: 'P', display_name: 'Ops', name: 'ops', delete_at: 0},
+            {id: 'c1', type: 'O', display_name: 'General', name: 'general', delete_at: 0},
+            {id: 'c4', type: 'D', display_name: '', name: 'u1__u2', delete_at: 0},
+            {id: 'c9', type: 'O', display_name: 'Old', name: 'old', delete_at: 5},
+        ]);
+        try {
+            render(<BoardPage/>);
+            await screen.findByText('write');
+            const options = within(screen.getByLabelText('Channel')).getAllByRole('option').map((o) => o.textContent);
+            expect(options).toEqual(['~General', '~Ops']);
+            expect(mocked.listTasks).toHaveBeenLastCalledWith(expect.objectContaining({channel_id: 'c1'}));
+            expect(screen.queryByText('Join a channel to see its tasks.')).toBeNull();
+        } finally {
+            state.entities.channels = saved;
+        }
     });
 
     it('remembers the chosen channel and reloads for it', async () => {

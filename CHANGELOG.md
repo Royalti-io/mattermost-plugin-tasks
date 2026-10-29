@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 - 2026-10-29
+
+- The board now works when `/tasks-board` is opened directly. It used to show an empty channel picker and "Join a channel to see its tasks" until you opened a team first.
+
 ## 0.1.1 - 2026-10-29
 
 - The Tasks side panel now scrolls when the list is longer than the window.

@@ -89,7 +89,7 @@ SKIP_DOCKER_TESTS=1 go test ./server/...     # unit tests, no Docker
 go test ./server/store/sqlstore              # store tests against Postgres (Docker)
 
 # Integration tests start a real Mattermost and Postgres and deploy the built bundle:
-make apply server bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
+make apply server webapp bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
 MM_TEST_IMAGE=mattermost/mattermost-team-edition:12.0.1 go test ./server
 
 make dist                                    # build the release bundle in dist/

@@ -16,7 +16,7 @@ permissions, reminders, websocket events, migrations), also run the integration
 tests; they are the ones that prove permissions hold on a real server:
 
 ```bash
-make apply server bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
+make apply server webapp bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
 MM_TEST_IMAGE=mattermost/mattermost-team-edition:12.0.1 go test ./server
 ```
 

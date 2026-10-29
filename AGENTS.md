@@ -33,7 +33,7 @@ Integration test caveats specific to this repo:
 - There's no build tag, so `go test ./...` includes them and fails without Docker. `SKIP_DOCKER_TESTS=1` skips them.
 - They test whatever bundle is in `dist/`, which must be linux/amd64 (see the `test` target comment in the Makefile). After a server change, rebuild it before running one by hand:
   ```bash
-  make apply server bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
+  make apply server webapp bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
   go test ./server -run TestPingEndpoint
   ```
-  This skips the webapp build but requires an existing `webapp/dist`; use `make dist` with the same variables the first time.
+  Drop `webapp` from the target list to skip the web build when only server code changed; `bundle` then needs an existing `webapp/dist`.

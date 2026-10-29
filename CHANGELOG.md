@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 - 2026-10-29
+
+- The Tasks side panel now scrolls when the list is longer than the window.
+
 ## 0.1.0 - 2026-10-29
 
 First public version.

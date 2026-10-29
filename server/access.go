@@ -6,12 +6,15 @@ import (
 	"strings"
 )
 
-// uiAllowed reports whether username appears in a comma-separated allowlist.
-// An empty allowlist admits nobody, so a missing setting fails closed.
+// uiAllowed reports whether a user should see the plugin UI. An empty allowlist
+// means everyone; otherwise only the listed usernames (comma separated) do.
 func uiAllowed(allowlist, username string) bool {
 	username = strings.ToLower(strings.TrimSpace(username))
 	if username == "" {
 		return false
+	}
+	if strings.TrimSpace(allowlist) == "" {
+		return true
 	}
 
 	for _, entry := range strings.Split(allowlist, ",") {

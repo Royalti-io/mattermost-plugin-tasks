@@ -18,8 +18,8 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
-	// UIAllowlist is a comma-separated list of usernames who see the plugin UI.
-	// Empty means nobody.
+	// UIAllowlist limits the plugin UI to these usernames (comma separated).
+	// Empty shows it to everyone.
 	UIAllowlist string
 
 	// DisableReminders stops the scheduled reminder and digest job.

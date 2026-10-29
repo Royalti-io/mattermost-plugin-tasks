@@ -24,10 +24,10 @@
         "settings": [
             {
                 "key": "UIAllowlist",
-                "display_name": "UI allowlist (usernames)",
+                "display_name": "Limit the UI to these usernames",
                 "type": "text",
-                "help_text": "Comma-separated usernames who see the Tasks UI. Empty means nobody. Used to limit exposure while the plugin is in development.",
-                "default": "chinedumokerengwor"
+                "help_text": "Comma-separated usernames. Leave empty to show the Tasks UI to everyone. Useful for a staged rollout; the REST API is not affected.",
+                "default": ""
             },
             {
                 "key": "DisableReminders",
@@ -51,5 +51,6 @@
                 "default": ""
             }
         ]
-    }
+    },
+    "release_notes_url": "https://github.com/Royalti-io/mattermost-plugin-tasks/releases"
 }

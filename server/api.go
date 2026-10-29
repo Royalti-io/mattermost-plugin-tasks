@@ -26,7 +26,7 @@ func (p *Plugin) initRouter() *mux.Router {
 
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
 
-	apiRouter.HandleFunc("/hello", p.HelloWorld).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/ping", p.Ping).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/access", p.Access).Methods(http.MethodGet)
 
 	apiRouter.HandleFunc("/tasks", p.ListTasks).Methods(http.MethodGet)
@@ -44,8 +44,7 @@ func (p *Plugin) initRouter() *mux.Router {
 	return router
 }
 
-// ServeHTTP demonstrates a plugin that handles HTTP requests by greeting the world.
-// The root URL is currently <siteUrl>/plugins/com.royalti.tasks/api/v1/. Replace com.royalti.tasks with the plugin ID.
+// ServeHTTP serves the plugin's REST API at <siteUrl>/plugins/com.royalti.tasks/api/v1/.
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	p.router.ServeHTTP(w, r)
 }
@@ -159,9 +158,7 @@ func setSecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func (p *Plugin) HelloWorld(w http.ResponseWriter, r *http.Request) {
-	if _, err := w.Write([]byte("Hello, world!")); err != nil {
-		requestLogger(r).WithError(err).Errorf("Failed to write response")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+// Ping reports that the plugin is running. It needs a logged-in caller like every other route.
+func (p *Plugin) Ping(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

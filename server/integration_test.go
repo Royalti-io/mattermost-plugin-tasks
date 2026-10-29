@@ -12,10 +12,10 @@ import (
 
 // Exercises the real request path — server auth, then plugin ServeHTTP — unlike the
 // httptest-based unit test in plugin_test.go.
-func TestHelloEndpoint(t *testing.T) {
+func TestPingEndpoint(t *testing.T) {
 	th := testhelper.Setup(t)
 
-	pluginURL := th.ServerURL + "/plugins/" + testhelper.PluginID() + "/api/v1/hello"
+	pluginURL := th.ServerURL + "/plugins/" + testhelper.PluginID() + "/api/v1/ping"
 
 	req, err := http.NewRequest(http.MethodGet, pluginURL, nil)
 	require.NoError(t, err)
@@ -29,6 +29,6 @@ func TestHelloEndpoint(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "Hello, world!", string(body))
+	assert.JSONEq(t, `{"status":"ok"}`, string(body))
 	assert.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
 }

@@ -141,10 +141,12 @@ Returns `{"tasks": [...]}` ordered by `position`, then age.
   field).
 - `DELETE /tasks/{id}/checklist/{item}` returns `204`.
 
-### Access check: `GET /access`
+### Health and access
 
-Returns `{"ui_enabled": true|false}`: whether the web UI is shown to the caller
-(see the `UIAllowlist` setting).
+- `GET /ping` returns `{"status":"ok"}` for a logged-in caller.
+- `GET /access` returns `{"ui_enabled": true|false}`: whether the web UI is shown to the
+  caller (see the *Limit the UI to these usernames* setting). The API itself is not
+  affected by that setting.
 
 ### Run reminders now: `POST /admin/run-reminders`
 

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Mattermost plugin starter template: a Go server plugin (`server/`) and a React/TypeScript webapp plugin (`webapp/`). Either half can be deleted; the Makefile skips whatever `plugin.json` doesn't declare.
+Mattermost Tasks plugin: a Go server plugin (`server/`, REST API, Postgres store, reminders, webhooks) and a React/TypeScript webapp plugin (`webapp/`, list panel and Kanban board). Started from the Mattermost plugin starter template. See README.md for the layout and CONTRIBUTING.md for the rules that matter (append-only migrations, channel-based permissions).
 
 ## Commands
 
@@ -21,7 +21,7 @@ make test                                      # full check before pushing
 
 - `plugin.json` is the source of truth for ID, version, and settings. `make apply` generates `server/manifest.go` and `webapp/src/manifest.ts` from it; both are gitignored, so never edit them.
 - Project-specific make targets go in `build/custom.mk`.
-- Package layout follows the README's "Development guidance": stay in `main` unless there's a reason not to.
+- Server code is in package `main` except the pure task model (`server/tasks`) and the Postgres store (`server/store/sqlstore`).
 
 ## Backend tests
 
@@ -34,6 +34,6 @@ Integration test caveats specific to this repo:
 - They test whatever bundle is in `dist/`, which must be linux/amd64 (see the `test` target comment in the Makefile). After a server change, rebuild it before running one by hand:
   ```bash
   make apply server bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
-  go test ./server -run TestHelloEndpoint
+  go test ./server -run TestPingEndpoint
   ```
   This skips the webapp build but requires an existing `webapp/dist`; use `make dist` with the same variables the first time.

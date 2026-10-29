@@ -1,223 +1,114 @@
-# Plugin Starter Template
+# Tasks for Mattermost
 
-[![Build Status](https://github.com/Royalti-io/mattermost-plugin-tasks/actions/workflows/ci.yml/badge.svg)](https://github.com/Royalti-io/mattermost-plugin-tasks/actions/workflows/ci.yml)
-[![E2E Status](https://github.com/Royalti-io/mattermost-plugin-tasks/actions/workflows/e2e.yml/badge.svg)](https://github.com/Royalti-io/mattermost-plugin-tasks/actions/workflows/e2e.yml)
+Channel-scoped tasks for Mattermost, with a list panel, a Kanban board, due-date
+reminders and a REST API for bots and scripts. Tasks live inside Mattermost, in the
+plugin's own tables in your Mattermost Postgres database.
 
-This plugin serves as a starting point for writing a Mattermost plugin. Feel free to base your own plugin off this repository.
+- **List panel** in the right-hand sidebar: this channel, assigned to me, or all your
+  channels; search and status filter; quick add; complete with a click; edit title,
+  description, priority, due date and checklist inline.
+- **Kanban board** at `/tasks-board`: five columns (Backlog, To do, In progress,
+  Blocked, Done), drag and drop, quick add per column.
+- **Create from a message**: post menu → *Create task*. The task links back to the
+  message and the Tasks bot can reply in the thread.
+- **Reminders**: a direct message from the Tasks bot when a task is due within a day
+  or newly overdue, plus an opt-in daily digest at 09:00 in the user's own timezone.
+- **Slash command**: `/task add`, `/task list`, `/task digest on|off`, `/task help`.
+- **REST API and signed webhooks** for agents and integrations. One bot per
+  integration; access follows channel membership. See [docs/api.md](docs/api.md).
+- **Live updates** over the Mattermost websocket.
 
-To learn more about plugins, see [our plugin documentation](https://developers.mattermost.com/extend/plugins/).
+Access follows channels: you can see a task if you can read its channel, and change
+it if you can post there. Private channels stay private.
 
-This template requires node v16 and npm v8. You can download and install nvm to manage your node versions by following the instructions [here](https://github.com/nvm-sh/nvm). Once you've setup the project simply run `nvm i` within the root folder to use the suggested version of node.
+## Requirements
 
-## Getting Started
-Use GitHub's template feature to make a copy of this repository by clicking the "Use this template" button.
+- Mattermost **12.0 or later** (the web app is built for React 19).
+- PostgreSQL (the plugin creates its own `rt_tasks_*` tables).
+- No Enterprise licence needed; it is developed and tested against the Team edition.
 
-Alternatively shallow clone the repository matching your plugin name:
+## Install
+
+1. Download `com.royalti.tasks-<version>.tar.gz` from the
+   [releases page](https://github.com/Royalti-io/mattermost-plugin-tasks/releases).
+2. In System Console → Plugins → Plugin Management, enable **Enable Plugins** and
+   **Enable Uploads** (`PluginSettings.EnableUploads`), then upload the file.
+3. Enable the plugin. The first start creates its tables and a `tasks` bot.
+
+Open the panel with the Tasks icon in the channel header, or the board from the
+**Open board** link or the product switcher.
+
+## Configuration
+
+System Console → Plugins → Tasks:
+
+| Setting | Purpose |
+|---|---|
+| Limit the UI to these usernames | Empty shows the UI to everyone. Handy for a staged rollout. It does not affect the API. |
+| Disable reminders | Stops reminder DMs and digests. |
+| Webhook URL / Webhook secret | Receive a signed POST for every task change. See [docs/api.md](docs/api.md#webhooks). |
+
+For agents, create a bot account per integration, add it to the team and to only the
+channels it needs, and give it a token. [docs/api.md](docs/api.md#setting-up-an-agent-or-integration)
+has the steps.
+
+## Data, upgrades and removal
+
+Migrations run automatically on activation and are safe to re-run. They are
+append-only; back up your database before upgrading as you would for any plugin.
+
+Disabling the plugin keeps your data. To remove it completely, disable the plugin
+and drop its tables:
+
+```sql
+DROP TABLE rt_tasks_reminder_state, rt_tasks_checklist_item, rt_tasks_label,
+           rt_tasks_assignee, rt_tasks_task, rt_tasks_migrations;
 ```
-git clone --depth 1 https://github.com/Royalti-io/mattermost-plugin-tasks com.example.my-plugin
-```
 
-Note that this project uses [Go modules](https://github.com/golang/go/wiki/Modules). Be sure to locate the project outside of `$GOPATH`.
+User preferences (the digest setting) live in the plugin's key-value store.
 
-Edit the following files:
-1. `plugin.json` with your `id`, `name`, and `description`:
-```json
-{
-    "id": "com.example.my-plugin",
-    "name": "My Plugin",
-    "description": "A plugin to enhance Mattermost."
-}
-```
+## Known limits
 
-2. `go.mod` with your Go module path, following the `<hosting-site>/<repository>/<module>` convention:
-```
-module github.com/example/my-plugin
-```
-
-3. Replace all occurrences of `github.com/Royalti-io/mattermost-plugin-tasks` in the codebase with your Go module path:
-```bash
-sed -i '' 's|github.com/Royalti-io/mattermost-plugin-tasks|github.com/example/my-plugin|g' server/*.go
-```
-
-4. Replace `.golangci.yml` `local-prefixes` attribute with your Go module path:
-```yml
-linters-settings:
-  # [...]
-  goimports:
-    local-prefixes: github.com/example/my-plugin
-```
-
-5. Build your plugin:
-```
-make
-```
-
-This will produce a single plugin file (with support for multiple architectures) for upload to your Mattermost server:
-
-```
-dist/com.example.my-plugin.tar.gz
-```
+- Statuses are fixed (Backlog, To do, In progress, Blocked, Done). Custom columns are
+  planned.
+- The web UI can assign a task to yourself; assigning to others is done through the
+  API for now.
+- No file attachments, recurring tasks or time tracking.
+- Many repeated drops between the same two cards eventually run out of float
+  precision and fall back to ordering by age.
+- Direct and group messages are not offered in the board's channel picker.
 
 ## Development
 
-To avoid having to manually install your plugin, build and deploy your plugin using one of the following options. In order for the below options to work, you must first enable plugin uploads via your config.json or API and restart Mattermost.
+Requirements: Go (see `go.mod`), Node (see `.nvmrc`), Docker for the integration tests.
 
-```json
-    "PluginSettings" : {
-        ...
-        "EnableUploads" : true
-    }
-```
-
-### Development guidance
-
-1. Fewer packages is better: default to the main package unless there's good reason for a new package.
-
-2. Coupling implies same package: don't jump through hoops to break apart code that's naturally coupled.
-
-3. New package for a new interface: a classic example is the sqlstore with layers for monitoring performance, caching and mocking.
-
-4. New package for upstream integration: a discrete client package for interfacing with a 3rd party is often a great place to break out into a new package
-
-### Modifying the server boilerplate
-
-The server code comes with some boilerplate for creating an api, using slash commands, accessing the kvstore and using the cluster package for jobs.
-
-#### Api
-
-api.go implements the ServeHTTP hook which allows the plugin to implement the http.Handler interface. Requests destined for the `/plugins/{id}` path will be routed to the plugin. This file also contains a sample `HelloWorld` endpoint that is tested in plugin_test.go.
-
-#### Command package
-
-This package contains the boilerplate for adding a slash command and an instance of it is created in the `OnActivate` hook in plugin.go. If you don't need it you can delete the package and remove any reference to `commandClient` in plugin.go. The package also contains an example of how to create a mock for testing.
-
-#### KVStore package
-
-This is a central place for you to access the KVStore methods that are available in the `pluginapi.Client`. The package contains an interface for you to define your methods that will wrap the KVStore methods. An instance of the KVStore is created in the `OnActivate` hook.
-
-### Deploying with Local Mode
-
-If your Mattermost server is running locally, you can enable [local mode](https://docs.mattermost.com/administration/mmctl-cli-tool.html#local-mode) to streamline deploying your plugin. Edit your server configuration as follows:
-
-```json
-{
-    "ServiceSettings": {
-        ...
-        "EnableLocalMode": true,
-        "LocalModeSocketLocation": "/var/tmp/mattermost_local.socket"
-    },
-}
-```
-
-and then deploy your plugin:
-```
-make deploy
-```
-
-You may also customize the Unix socket path:
 ```bash
-export MM_LOCALSOCKETPATH=/var/tmp/alternate_local.socket
-make deploy
+make apply                                   # generate the manifest files
+cd webapp && npm ci && npm run lint && npm run check-types && npx jest
+SKIP_DOCKER_TESTS=1 go test ./server/...     # unit tests, no Docker
+go test ./server/store/sqlstore              # store tests against Postgres (Docker)
+
+# Integration tests start a real Mattermost and Postgres and deploy the built bundle:
+make apply server bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
+MM_TEST_IMAGE=mattermost/mattermost-team-edition:12.0.1 go test ./server
+
+make dist                                    # build the release bundle in dist/
 ```
 
-If developing a plugin with a webapp, watch for changes and deploy those automatically:
-```bash
-export MM_SERVICESETTINGS_SITEURL=http://localhost:8065
-export MM_ADMIN_TOKEN=j44acwd8obn78cdcx7koid4jkr
-make watch
-```
+Layout:
 
-### Deploying with credentials
+- `server/`: plugin entry point, REST handlers (`api*.go`), reminders and digest
+  (`reminders.go`), `/task` command (`commands.go`), webhooks (`webhook.go`,
+  `emit.go`).
+- `server/tasks/`: task model and validation (no Mattermost or SQL dependencies).
+- `server/store/sqlstore/`: Postgres store and migrations.
+- `webapp/src/`: the React app; `components/` holds the panel, board and dialogs.
+- `docs/api.md`: REST API, agent setup and webhooks.
 
-Alternatively, you can authenticate with the server's API with credentials:
-```bash
-export MM_SERVICESETTINGS_SITEURL=http://localhost:8065
-export MM_ADMIN_USERNAME=admin
-export MM_ADMIN_PASSWORD=password
-make deploy
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-or with a [personal access token](https://docs.mattermost.com/developer/personal-access-tokens.html):
-```bash
-export MM_SERVICESETTINGS_SITEURL=http://localhost:8065
-export MM_ADMIN_TOKEN=j44acwd8obn78cdcx7koid4jkr
-make deploy
-```
+## Licence
 
-### Releasing new versions
-
-The version of a plugin is determined at compile time, automatically populating a `version` field in the [plugin manifest](plugin.json):
-* If the current commit matches a tag, the version will match after stripping any leading `v`, e.g. `1.3.1`.
-* Otherwise, the version will combine the nearest tag with `git rev-parse --short HEAD`, e.g. `1.3.1+d06e53e1`.
-* If there is no version tag, an empty version will be combined with the short hash, e.g. `0.0.0+76081421`.
-
-To disable this behaviour, manually populate and maintain the `version` field.
-
-## How to Release
-
-To trigger a release, follow these steps:
-
-1. **For Patch Release:** Run the following command:
-    ```
-    make patch
-    ```
-   This will release a patch change.
-
-2. **For Minor Release:** Run the following command:
-    ```
-    make minor
-    ```
-   This will release a minor change.
-
-3. **For Major Release:** Run the following command:
-    ```
-    make major
-    ```
-   This will release a major change.
-
-4. **For Patch Release Candidate (RC):** Run the following command:
-    ```
-    make patch-rc
-    ```
-   This will release a patch release candidate.
-
-5. **For Minor Release Candidate (RC):** Run the following command:
-    ```
-    make minor-rc
-    ```
-   This will release a minor release candidate.
-
-6. **For Major Release Candidate (RC):** Run the following command:
-    ```
-    make major-rc
-    ```
-   This will release a major release candidate.
-
-## Q&A
-
-### How do I make a server-only or web app-only plugin?
-
-Simply delete the `server` or `webapp` folders and remove the corresponding sections from `plugin.json`. The build scripts will skip the missing portions automatically.
-
-### How do I include assets in the plugin bundle?
-
-Place them into the `assets` directory. To use an asset at runtime, build the path to your asset and open as a regular file:
-
-```go
-bundlePath, err := p.API.GetBundlePath()
-if err != nil {
-    return errors.Wrap(err, "failed to get bundle path")
-}
-
-profileImage, err := ioutil.ReadFile(filepath.Join(bundlePath, "assets", "profile_image.png"))
-if err != nil {
-    return errors.Wrap(err, "failed to read profile image")
-}
-
-if appErr := p.API.SetProfileImage(userID, profileImage); appErr != nil {
-    return errors.Wrap(err, "failed to set profile image")
-}
-```
-
-### How do I build the plugin with unminified JavaScript?
-Setting the `MM_DEBUG` environment variable will invoke the debug builds. The simplist way to do this is to simply include this variable in your calls to `make` (e.g. `make dist MM_DEBUG=1`).
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Started from the
+Apache-2.0 [Mattermost plugin starter template](https://github.com/mattermost/mattermost-plugin-starter-template).
+This project is not affiliated with or endorsed by Mattermost, Inc.

@@ -1,18 +1,70 @@
 name: ci
+
 on:
   push:
-    branches:
-      - master
-      - main
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  plugin-ci:
-    uses: mattermost/actions-workflows/.github/workflows/plugin-ci.yml@main
-    secrets: inherit
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the bundle version comes from git tags
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - name: Generate manifests
+        run: make apply
+      - name: Web app checks
+        working-directory: webapp
+        run: |
+          npm ci
+          npm run lint
+          npm run check-types
+          npx jest
+      - name: Server vet and unit tests
+        run: |
+          go vet ./...
+          SKIP_DOCKER_TESTS=1 go test ./...
+      - name: Store tests (Postgres in Docker)
+        run: go test ./server/store/sqlstore
+      - name: Build the bundle for integration tests
+        run: make apply server webapp bundle MM_SERVICESETTINGS_ENABLEDEVELOPER=true DEFAULT_GOOS=linux DEFAULT_GOARCH=amd64
+      - name: Integration tests (real Mattermost in Docker)
+        env:
+          MM_TEST_IMAGE: mattermost/mattermost-team-edition:12.0.1
+        run: go test ./server -count=1
+
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Build the release bundle
+        run: make dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/*.tar.gz --title "${GITHUB_REF_NAME}" --generate-notes

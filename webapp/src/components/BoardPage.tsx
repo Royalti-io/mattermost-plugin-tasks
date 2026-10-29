@@ -1,6 +1,7 @@
 
 import {api} from 'api';
 import {DONE_VISIBLE, dropPosition, groupByStatus, insertionIndex} from 'board';
+import {useChannelChoices} from 'channels';
 import {dueInfo} from 'format';
 import {useTasks} from 'hooks';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
@@ -41,12 +42,9 @@ export default function BoardPage() {
     const currentUserId = useSelector((s: GlobalState) => s.entities.users.currentUserId);
     const currentChannelId = useSelector((s: GlobalState) => s.entities.channels.currentChannelId);
     const channels = useSelector((s: GlobalState) => s.entities.channels.channels);
-    const myMembers = useSelector((s: GlobalState) => s.entities.channels.myMembers);
 
     // Public and private channels the user belongs to; DMs have no useful name to pick by.
-    const channelOptions = useMemo(() => Object.values(channels).
-        filter((c) => myMembers[c.id] && (c.type === 'O' || c.type === 'P') && c.delete_at === 0).
-        sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name)), [channels, myMembers]);
+    const channelOptions = useChannelChoices();
 
     const [scope, setScope] = useState<Scope>(() => {
         const saved = readPref(STORAGE_SCOPE);
@@ -184,7 +182,7 @@ export default function BoardPage() {
                             <option
                                 key={c.id}
                                 value={c.id}
-                            >{'~' + (c.display_name || c.name)}</option>
+                            >{c.label}</option>
                         ))}
                     </select>
                 ) : null}

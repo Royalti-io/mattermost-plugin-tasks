@@ -11,7 +11,7 @@ import {notifyTasksChanged} from 'taskEvents';
 import type {GlobalState} from '@mattermost/types/store';
 
 import BoardPage from 'components/BoardPage';
-import CreateFromPostModal, {openCreateFromPost} from 'components/CreateFromPostModal';
+import TaskCreateModal, {openCreateFromPost, openNewTask} from 'components/TaskCreateModal';
 import TasksPanel from 'components/TasksPanel';
 
 import type {PluginRegistry} from 'types/mattermost-webapp';
@@ -82,7 +82,18 @@ export default class Plugin {
                 action: ((postId: string) => openCreateFromPost(postId)) as unknown as () => void,
                 filter: () => true,
             });
-            registry.registerRootComponent(CreateFromPostModal);
+            registry.registerRootComponent(TaskCreateModal);
+
+            // The "+" menu at the top of the channel sidebar. Mattermost 12 has this hook but the
+            // bundled typings do not, so it is called through a narrow type and feature-detected.
+            const sidebarMenu = registry as unknown as {
+                registerSidebarBrowseOrAddChannelMenuAction?: (text: string, action: () => void, icon: React.ReactElement) => string;
+            };
+            sidebarMenu.registerSidebarBrowseOrAddChannelMenuAction?.(
+                'Create a task',
+                () => openNewTask(),
+                <i className='icon icon-check-circle-outline'/>,
+            );
 
             // The server publishes "custom_<plugin id>_task_changed" to channel members.
             registry.registerWebSocketEventHandler(`custom_${manifest.id}_task_changed`, () => notifyTasksChanged());

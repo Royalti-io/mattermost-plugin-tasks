@@ -1,6 +1,7 @@
 
 import {api} from 'api';
 import {getState} from 'bridge';
+import {useChannelChoices} from 'channels';
 import {dateInputToDueAt, postPermalink, titleFromMessage} from 'format';
 import React, {useEffect, useState} from 'react';
 import {useSelector} from 'react-redux';
@@ -12,9 +13,18 @@ import type {GlobalState} from '@mattermost/types/store';
 
 import AssigneePicker from './AssigneePicker';
 
-type Prefill = {postId: string; channelId: string; title: string; description: string};
+type Prefill = {
+    key: string;
+
+    // Set when the task is created from a message; the task then links back to it.
+    postId?: string;
+    channelId: string;
+    title: string;
+    description: string;
+};
 
 let current: Prefill | null = null;
+let counter = 0;
 const listeners = new Set<() => void>();
 
 function setCurrent(next: Prefill | null) {
@@ -30,10 +40,21 @@ export function openCreateFromPost(postId: string): void {
     }
     const link = postPermalink(window.location.origin, post.id);
     setCurrent({
+        key: `post-${post.id}`,
         postId: post.id,
         channelId: post.channel_id,
         title: titleFromMessage(post.message),
         description: `${post.message}\n\n${link}`.slice(0, 10000),
+    });
+}
+
+// Called from the sidebar "+" menu: a blank task, starting in the open channel.
+export function openNewTask(): void {
+    setCurrent({
+        key: `new-${++counter}`,
+        channelId: getState()?.entities.channels.currentChannelId || '',
+        title: '',
+        description: '',
     });
 }
 
@@ -50,16 +71,16 @@ function useCurrent(): Prefill | null {
     return value;
 }
 
-export default function CreateFromPostModal() {
+export default function TaskCreateModal() {
     const prefill = useCurrent();
     if (!prefill) {
         return null;
     }
 
-    // Keyed by post so reopening for another message starts from fresh fields.
+    // Keyed so reopening starts from fresh fields.
     return (
         <ModalBody
-            key={prefill.postId}
+            key={prefill.key}
             prefill={prefill}
         />
     );
@@ -67,7 +88,15 @@ export default function CreateFromPostModal() {
 
 function ModalBody({prefill}: {prefill: Prefill}) {
     const currentUserId = useSelector((s: GlobalState) => s.entities.users.currentUserId);
+    const choices = useChannelChoices(prefill.channelId);
+    const fromPost = Boolean(prefill.postId);
+
+    // From a message the channel is fixed; otherwise start in the open channel, or the first available.
+    const [channelId, setChannelId] = useState(() => (
+        choices.some((c) => c.id === prefill.channelId) ? prefill.channelId : (choices[0]?.id || prefill.channelId)
+    ));
     const [title, setTitle] = useState(prefill.title);
+    const [description, setDescription] = useState(prefill.description);
     const [priority, setPriority] = useState<Priority>('normal');
     const [due, setDue] = useState('');
     const [assignees, setAssignees] = useState<string[]>([currentUserId]);
@@ -75,6 +104,8 @@ function ModalBody({prefill}: {prefill: Prefill}) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const heading = fromPost ? 'Create task from message' : 'Create a task';
+    const noChannel = !fromPost && choices.length === 0;
     const close = () => setCurrent(null);
 
     useEffect(() => {
@@ -87,22 +118,30 @@ function ModalBody({prefill}: {prefill: Prefill}) {
         return () => document.removeEventListener('keydown', onKey);
     }, []);
 
+    const changeChannel = (id: string) => {
+        setChannelId(id);
+
+        // Other people may not be in the new channel, and the server only accepts members.
+        setAssignees([currentUserId]);
+    };
+
+    const canSubmit = Boolean(title.trim()) && Boolean(channelId) && !noChannel && !saving;
+
     const submit = async () => {
-        if (!title.trim() || saving) {
+        if (!canSubmit) {
             return;
         }
         setSaving(true);
         setError(null);
         try {
             await api.createTask({
-                channel_id: prefill.channelId,
+                channel_id: channelId,
                 title: title.trim(),
-                description: prefill.description,
+                description,
                 priority,
                 due_at: dateInputToDueAt(due),
                 assignees,
-                post_id: prefill.postId,
-                notify_thread: notify,
+                ...(fromPost ? {post_id: prefill.postId, notify_thread: notify} : {}),
             });
             notifyTasksChanged();
             close();
@@ -125,9 +164,27 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                 className='rt-modal'
                 role='dialog'
                 aria-modal='true'
-                aria-label='Create task from message'
+                aria-label={heading}
             >
-                <h2 className='rt-modal__title'>{'Create task from message'}</h2>
+                <h2 className='rt-modal__title'>{heading}</h2>
+                {fromPost ? null : (
+                    <label className='rt-field'>
+                        {'Channel'}
+                        <select
+                            className='rt-input'
+                            value={channelId}
+                            onChange={(e) => changeChannel(e.target.value)}
+                        >
+                            {choices.map((c) => (
+                                <option
+                                    key={c.id}
+                                    value={c.id}
+                                >{c.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                )}
+                {noChannel ? <div className='rt-error'>{'Join a channel to create tasks.'}</div> : null}
                 <label className='rt-field'>
                     {'Title'}
                     <input
@@ -141,6 +198,16 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                                 submit();
                             }
                         }}
+                    />
+                </label>
+                <label className='rt-field'>
+                    {'Description'}
+                    <textarea
+                        className='rt-input'
+                        rows={3}
+                        maxLength={10000}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                     />
                 </label>
                 <div className='rt-detail__fields'>
@@ -172,20 +239,23 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                 <div className='rt-field'>
                     {'Assignees'}
                     <AssigneePicker
-                        channelId={prefill.channelId}
+                        key={channelId}
+                        channelId={channelId}
                         assignees={assignees}
                         currentUserId={currentUserId}
                         onChange={setAssignees}
                     />
                 </div>
-                <label className='rt-inline'>
-                    <input
-                        type='checkbox'
-                        checked={notify}
-                        onChange={(e) => setNotify(e.target.checked)}
-                    />
-                    {'Reply in the thread'}
-                </label>
+                {fromPost ? (
+                    <label className='rt-inline'>
+                        <input
+                            type='checkbox'
+                            checked={notify}
+                            onChange={(e) => setNotify(e.target.checked)}
+                        />
+                        {'Reply in the thread'}
+                    </label>
+                ) : null}
                 {error ? (
                     <div
                         className='rt-error'
@@ -201,7 +271,7 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                     <button
                         type='button'
                         className='rt-btn'
-                        disabled={!title.trim() || saving}
+                        disabled={!canSubmit}
                         onClick={submit}
                     >{saving ? 'Creating…' : 'Create task'}</button>
                 </div>

@@ -19,10 +19,11 @@ const commandHelp = "" +
 	"- `/task add <title>`: add a task to this channel\n" +
 	"- `/task list`: your open assigned tasks\n" +
 	"- `/task digest on|off|status`: a daily summary DM of what is due\n" +
+	"- `/task private on|off|status`: make the tasks you create private by default (only you and the people assigned can see them)\n" +
 	"- `/task help`: this message"
 
 func (p *Plugin) registerCommand() error {
-	root := model.NewAutocompleteData(commandTrigger, "[add|list|digest|help]", "Manage tasks")
+	root := model.NewAutocompleteData(commandTrigger, "[add|list|digest|private|help]", "Manage tasks")
 	root.AddCommand(model.NewAutocompleteData("add", "<title>", "Add a task to this channel"))
 	root.AddCommand(model.NewAutocompleteData("list", "", "List your open assigned tasks"))
 	digest := model.NewAutocompleteData("digest", "[on|off|status]", "Daily summary of your due tasks")
@@ -32,13 +33,20 @@ func (p *Plugin) registerCommand() error {
 		{Item: "status", HelpText: "Show whether it is on"},
 	})
 	root.AddCommand(digest)
+	private := model.NewAutocompleteData("private", "[on|off|status]", "Make your new tasks private by default")
+	private.AddStaticListArgument("", true, []model.AutocompleteListItem{
+		{Item: "on", HelpText: "New tasks are private unless you share them"},
+		{Item: "off", HelpText: "New tasks are visible to the channel"},
+		{Item: "status", HelpText: "Show the current setting"},
+	})
+	root.AddCommand(private)
 	root.AddCommand(model.NewAutocompleteData("help", "", "Show command help"))
 
 	return p.client.SlashCommand.Register(&model.Command{
 		Trigger:          commandTrigger,
 		AutoComplete:     true,
 		AutoCompleteDesc: "Manage tasks",
-		AutoCompleteHint: "[add|list|digest|help]",
+		AutoCompleteHint: "[add|list|digest|private|help]",
 		AutocompleteData: root,
 	})
 }
@@ -63,6 +71,8 @@ func (p *Plugin) ExecuteCommand(_ *plugin.Context, args *model.CommandArgs) (*mo
 		return p.commandList(ctx, args), nil
 	case "digest":
 		return p.commandDigest(args, arg), nil
+	case "private":
+		return p.commandPrivate(args, arg), nil
 	case "", "help":
 		return ephemeral(commandHelp), nil
 	default:
@@ -78,13 +88,23 @@ func (p *Plugin) commandAdd(ctx context.Context, args *model.CommandArgs, title 
 	if !p.canWrite(args.UserId, args.ChannelId) {
 		return ephemeral("You cannot create tasks in this channel.")
 	}
+	prefs, err := p.getPrefs(args.UserId)
+	if err != nil {
+		p.client.Log.Error("Task command failed", "error", err.Error())
+		return ephemeral("Something went wrong reading your settings.")
+	}
+	in.Private = &prefs.PrivateByDefault
 	t, _, err := p.tasks.Create(ctx, in, args.UserId)
 	if err != nil {
 		p.client.Log.Error("Task command failed", "error", err.Error())
 		return ephemeral("Something went wrong adding the task.")
 	}
 	p.emit("created", args.UserId, t)
-	return ephemeral(fmt.Sprintf("Added task **%s**. Open the Tasks panel to set a due date or assign it.", escapeMarkdown(t.Title)))
+	visibility := ""
+	if t.Private {
+		visibility = " It is private: only you and the people you assign can see it."
+	}
+	return ephemeral(fmt.Sprintf("Added task **%s**.%s Open the Tasks panel to set a due date or assign it.", escapeMarkdown(t.Title), visibility))
 }
 
 func (p *Plugin) commandList(ctx context.Context, args *model.CommandArgs) *model.CommandResponse {
@@ -95,6 +115,7 @@ func (p *Plugin) commandList(ctx context.Context, args *model.CommandArgs) *mode
 	}
 	list, err := p.tasks.List(ctx, tasks.Filter{
 		ChannelIDs: channelIDs,
+		ViewerID:   args.UserId,
 		AssigneeID: args.UserId,
 		Statuses:   []string{tasks.StatusBacklog, tasks.StatusTodo, tasks.StatusInProgress, tasks.StatusBlocked},
 		Limit:      15,
@@ -152,4 +173,28 @@ func (p *Plugin) commandDigest(args *model.CommandArgs, arg string) *model.Comma
 	default:
 		return ephemeral("Usage: `/task digest on|off|status`")
 	}
+}
+
+func (p *Plugin) commandPrivate(args *model.CommandArgs, arg string) *model.CommandResponse {
+	prefs, err := p.getPrefs(args.UserId)
+	if err != nil {
+		p.client.Log.Error("Task command failed", "error", err.Error())
+		return ephemeral("Something went wrong reading your settings.")
+	}
+
+	switch strings.ToLower(arg) {
+	case "on", "off":
+		prefs.PrivateByDefault = strings.EqualFold(arg, "on")
+		if err = p.setPrefs(args.UserId, prefs); err != nil {
+			return ephemeral("Something went wrong saving your settings.")
+		}
+	case "", "status":
+	default:
+		return ephemeral("Usage: `/task private on|off|status`")
+	}
+
+	if prefs.PrivateByDefault {
+		return ephemeral("New tasks are **private** by default: only you and the people assigned can see them. Turn it off with `/task private off`.")
+	}
+	return ephemeral("New tasks are **shared** with the channel by default. Make them private with `/task private on`.")
 }

@@ -13,7 +13,7 @@ import type {GlobalState} from '@mattermost/types/store';
 import TaskCreateModal, {openCreateFromPost, openNewTask} from './TaskCreateModal';
 
 jest.mock('api', () => ({
-    api: {createTask: jest.fn()},
+    api: {createTask: jest.fn(), getPrefs: jest.fn()},
     userApi: {autocomplete: jest.fn(), byIds: jest.fn()},
 }));
 
@@ -51,6 +51,10 @@ beforeEach(() => {
     users.autocomplete.mockResolvedValue([{id: 'u2', username: 'roy'}]);
     users.byIds.mockResolvedValue([]);
     setStore({getState: () => mockState} as unknown as Store<GlobalState>);
+});
+
+beforeEach(() => {
+    mocked.getPrefs.mockResolvedValue({private_by_default: false});
 });
 
 afterEach(() => {
@@ -105,6 +109,36 @@ describe('creating from a message', () => {
 
         await waitFor(() => expect(mocked.createTask).toHaveBeenCalled());
         expect(mocked.createTask.mock.calls[0][0]).toMatchObject({assignees: [], notify_thread: false});
+    });
+
+    it('leaves privacy to the saved default until the user picks', async () => {
+        mocked.getPrefs.mockResolvedValue({private_by_default: true});
+        mocked.createTask.mockResolvedValue({} as never);
+        render(<TaskCreateModal/>);
+        act(() => openNewTask());
+        await screen.findByRole('dialog');
+
+        const box = screen.getByLabelText(/^Private/) as HTMLInputElement;
+        await waitFor(() => expect(box.checked).toBe(true));
+
+        fireEvent.change(screen.getByLabelText('Title'), {target: {value: 'Quiet task'}});
+        fireEvent.click(screen.getByText('Create task'));
+        await waitFor(() => expect(mocked.createTask).toHaveBeenCalledTimes(1));
+        expect(mocked.createTask.mock.calls[0][0]).not.toHaveProperty('private');
+    });
+
+    it('sends an explicit privacy choice', async () => {
+        mocked.createTask.mockResolvedValue({} as never);
+        render(<TaskCreateModal/>);
+        act(() => openNewTask());
+        await screen.findByRole('dialog');
+
+        fireEvent.change(screen.getByLabelText('Title'), {target: {value: 'Hush'}});
+        fireEvent.click(screen.getByLabelText(/^Private/));
+        fireEvent.click(screen.getByText('Create task'));
+
+        await waitFor(() => expect(mocked.createTask).toHaveBeenCalledTimes(1));
+        expect(mocked.createTask.mock.calls[0][0]).toMatchObject({private: true});
     });
 
     it('keeps the dialog open and shows the error when creation fails', async () => {

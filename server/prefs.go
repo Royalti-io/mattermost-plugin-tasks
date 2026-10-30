@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/mattermost/mattermost/server/public/pluginapi"
@@ -11,6 +12,8 @@ import (
 type userPrefs struct {
 	// Digest turns on the daily summary DM.
 	Digest bool `json:"digest"`
+	// PrivateByDefault makes tasks the user creates private unless they say otherwise.
+	PrivateByDefault bool `json:"private_by_default"`
 	// LastDigestDate is the user's local date (YYYY-MM-DD) of the last digest, so it is sent once a day.
 	LastDigestDate string `json:"last_digest_date"`
 }
@@ -80,4 +83,44 @@ func (p *Plugin) digestUserIDs() ([]string, error) {
 			return ids, nil
 		}
 	}
+}
+
+type prefsResponse struct {
+	PrivateByDefault bool `json:"private_by_default"`
+}
+
+// GetPrefs returns the caller's settings that the webapp needs.
+func (p *Plugin) GetPrefs(w http.ResponseWriter, r *http.Request) {
+	prefs, err := p.getPrefs(callerID(r))
+	if err != nil {
+		p.storeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, prefsResponse{PrivateByDefault: prefs.PrivateByDefault})
+}
+
+type prefsPatch struct {
+	PrivateByDefault *bool `json:"private_by_default"`
+}
+
+// UpdatePrefs changes the caller's settings; absent fields are left alone.
+func (p *Plugin) UpdatePrefs(w http.ResponseWriter, r *http.Request) {
+	var patch prefsPatch
+	if err := decodeJSON(r, &patch); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	prefs, err := p.getPrefs(callerID(r))
+	if err != nil {
+		p.storeError(w, r, err)
+		return
+	}
+	if patch.PrivateByDefault != nil {
+		prefs.PrivateByDefault = *patch.PrivateByDefault
+	}
+	if err = p.setPrefs(callerID(r), prefs); err != nil {
+		p.storeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, prefsResponse{PrivateByDefault: prefs.PrivateByDefault})
 }

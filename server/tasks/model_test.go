@@ -91,3 +91,16 @@ func TestPatchNormalize(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ok", *p.Title)
 }
+
+func TestTaskCanSee(t *testing.T) {
+	shared := &Task{CreatedBy: "creator", Assignees: []string{"assignee"}}
+	private := &Task{CreatedBy: "creator", Assignees: []string{"assignee"}, Private: true}
+
+	for _, uid := range []string{"creator", "assignee", "bystander"} {
+		assert.True(t, shared.CanSee(uid), "a shared task is visible to %s", uid)
+	}
+	assert.True(t, private.CanSee("creator"))
+	assert.True(t, private.CanSee("assignee"))
+	assert.False(t, private.CanSee("bystander"))
+	assert.False(t, private.CanSee(""))
+}

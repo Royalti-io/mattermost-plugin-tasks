@@ -35,7 +35,7 @@ type Store struct {
 func New(db *sql.DB) *Store { return &Store{db: db} }
 
 const taskCols = `id, channel_id, title, description, status, priority, due_at, position,
-	created_by, created_at, updated_at, completed_at, post_id, source, external_id`
+	created_by, created_at, updated_at, completed_at, post_id, source, external_id, is_private`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -46,7 +46,7 @@ func scanTask(sc rowScanner) (*tasks.Task, error) {
 		post, source, ext sql.NullString
 	)
 	if err := sc.Scan(&t.ID, &t.ChannelID, &t.Title, &t.Description, &t.Status, &t.Priority,
-		&due, &t.Position, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt, &completed, &post, &source, &ext); err != nil {
+		&due, &t.Position, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt, &completed, &post, &source, &ext, &t.Private); err != nil {
 		return nil, err
 	}
 	if due.Valid {
@@ -222,11 +222,11 @@ func (s *Store) Create(ctx context.Context, in tasks.CreateInput, createdBy stri
 
 		res, execErr := tx.ExecContext(ctx, `INSERT INTO rt_tasks_task
 			(id, channel_id, title, description, status, priority, due_at, position,
-			 created_by, created_at, updated_at, completed_at, post_id, source, external_id)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$11,$12,$13,$14)
+			 created_by, created_at, updated_at, completed_at, post_id, source, external_id, is_private)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$11,$12,$13,$14,$15)
 			ON CONFLICT (source, external_id) WHERE source IS NOT NULL AND external_id IS NOT NULL DO NOTHING`,
 			id, in.ChannelID, in.Title, in.Description, in.Status, in.Priority, in.DueAt, pos,
-			createdBy, now, completed, nullIfEmpty(in.PostID), nullIfEmpty(in.Source), nullIfEmpty(in.ExternalID))
+			createdBy, now, completed, nullIfEmpty(in.PostID), nullIfEmpty(in.Source), nullIfEmpty(in.ExternalID), in.Private != nil && *in.Private)
 		if execErr != nil {
 			return execErr
 		}
@@ -300,6 +300,9 @@ func (s *Store) Update(ctx context.Context, id string, p tasks.Patch) (*tasks.Ta
 		}
 		if p.DueAt.Set {
 			sets = append(sets, "due_at = "+b.arg(p.DueAt.Value))
+		}
+		if p.Private != nil {
+			sets = append(sets, "is_private = "+b.arg(*p.Private))
 		}
 		if p.Status != nil && *p.Status != cur.Status {
 			pos, perr := endOfColumn(ctx, tx, cur.ChannelID, *p.Status)
@@ -395,12 +398,15 @@ func escapeLike(s string) string {
 
 // List returns live tasks matching the filter, ordered for board display.
 func (s *Store) List(ctx context.Context, f tasks.Filter) ([]*tasks.Task, error) {
-	if len(f.ChannelIDs) == 0 {
+	if len(f.ChannelIDs) == 0 || f.ViewerID == "" {
 		return []*tasks.Task{}, nil
 	}
 
 	b := &builder{}
 	b.write(`SELECT ` + taskCols + ` FROM rt_tasks_task WHERE deleted_at IS NULL AND channel_id IN (` + placeholders(b, f.ChannelIDs) + `)`)
+	viewer := b.arg(f.ViewerID)
+	b.write(` AND (NOT is_private OR created_by = ` + viewer +
+		` OR EXISTS (SELECT 1 FROM rt_tasks_assignee v WHERE v.task_id = rt_tasks_task.id AND v.user_id = ` + viewer + `))`)
 	if f.AssigneeID != "" {
 		b.write(` AND EXISTS (SELECT 1 FROM rt_tasks_assignee a WHERE a.task_id = rt_tasks_task.id AND a.user_id = ` + b.arg(f.AssigneeID) + `)`)
 	}

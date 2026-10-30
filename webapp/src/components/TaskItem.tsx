@@ -52,6 +52,12 @@ export default function TaskItem({task, channelName, currentUserId, userName, re
                 >
                     {task.title}
                 </button>
+                {task.private ? (
+                    <span
+                        className='rt-chip'
+                        title='Only you and the people assigned can see this task'
+                    >{'🔒 Private'}</span>
+                ) : null}
                 {task.priority === 'high' || task.priority === 'critical' ? (
                     <span className={`rt-chip rt-chip--${task.priority}`}>{task.priority}</span>
                 ) : null}

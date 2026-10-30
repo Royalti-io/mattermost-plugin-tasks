@@ -27,6 +27,9 @@ export type Task = {
     assignees: string[];
     labels: string[];
     checklist: ChecklistItem[];
+
+    // Private tasks are visible only to their creator and assignees.
+    private: boolean;
 };
 
 export const STATUSES: Array<{key: Status; label: string}> = [

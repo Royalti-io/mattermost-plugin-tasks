@@ -34,11 +34,12 @@ func buildEvent(action string, actor eventActor, t *tasks.Task) (id, eventType s
 }
 
 // emit announces a task change to clients (websocket) and, when configured, to the webhook.
-// action is one of created, updated, moved, deleted.
+// action is one of created, updated, moved, deleted. Private tasks reach only their
+// creator and assignees over the websocket and are never sent to the webhook.
 func (p *Plugin) emit(action, actorID string, t *tasks.Task) {
-	p.publishTaskChanged(action, t.ChannelID, t.ID)
+	p.publishTaskChanged(action, t)
 
-	if !p.webhooks.Enabled() {
+	if t.Private || !p.webhooks.Enabled() {
 		return
 	}
 	actor := eventActor{ID: actorID}
@@ -53,17 +54,13 @@ func (p *Plugin) emit(action, actorID string, t *tasks.Task) {
 	p.webhooks.Enqueue(id, eventType, body)
 }
 
-// emitByID is emit for callers that do not hold the changed task; it loads the
-// task only when a webhook is configured.
-func (p *Plugin) emitByID(action, actorID, channelID, taskID string) {
-	if !p.webhooks.Enabled() {
-		p.publishTaskChanged(action, channelID, taskID)
-		return
-	}
-	t, err := p.tasks.Get(context.Background(), taskID)
+// emitByID is emit for callers whose copy of the task predates the change: it
+// reloads the task so the event carries its current state, and falls back to the
+// stale copy when the reload fails.
+func (p *Plugin) emitByID(action, actorID string, stale *tasks.Task) {
+	t, err := p.tasks.Get(context.Background(), stale.ID)
 	if err != nil {
-		p.publishTaskChanged(action, channelID, taskID)
-		return
+		t = stale
 	}
 	p.emit(action, actorID, t)
 }

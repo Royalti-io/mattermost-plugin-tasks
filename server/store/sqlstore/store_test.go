@@ -225,12 +225,18 @@ func TestListScopingAndFilters(t *testing.T) {
 	t4 := mk(t, s, tasks.CreateInput{ChannelID: "c3", Title: "Hidden channel"})
 
 	list := func(f tasks.Filter) []string {
+		if f.ViewerID == "" {
+			f.ViewerID = "viewer"
+		}
 		got, err := s.List(ctx, f)
 		require.NoError(t, err)
 		return ids(got)
 	}
 
 	assert.Empty(t, list(tasks.Filter{}), "no channels means no results")
+	got, err := s.List(ctx, tasks.Filter{ChannelIDs: []string{"c1"}})
+	require.NoError(t, err)
+	assert.Empty(t, got, "no viewer means no results")
 	assert.ElementsMatch(t, []string{t1.ID, t2.ID, t3.ID}, list(tasks.Filter{ChannelIDs: []string{"c1", "c2"}}))
 	assert.NotContains(t, list(tasks.Filter{ChannelIDs: []string{"c1", "c2"}}), t4.ID)
 	assert.ElementsMatch(t, []string{t1.ID, t3.ID}, list(tasks.Filter{ChannelIDs: []string{"c1", "c2"}, AssigneeID: "ann"}))
@@ -282,7 +288,7 @@ func TestMove(t *testing.T) {
 	pos := a.Position - 500
 	moved, err := s.Move(ctx, b.ID, tasks.StatusTodo, &pos)
 	require.NoError(t, err)
-	listed, err := s.List(ctx, tasks.Filter{ChannelIDs: []string{"c"}})
+	listed, err := s.List(ctx, tasks.Filter{ChannelIDs: []string{"c"}, ViewerID: "viewer"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{moved.ID, a.ID}, ids(listed), "explicit position reorders within a column")
 
@@ -304,7 +310,7 @@ func TestDeleteIsSoftAndHidesTask(t *testing.T) {
 	require.NoError(t, s.Delete(ctx, task.ID))
 	_, err := s.Get(ctx, task.ID)
 	assert.ErrorIs(t, err, ErrNotFound)
-	listed, err := s.List(ctx, tasks.Filter{ChannelIDs: []string{"c"}})
+	listed, err := s.List(ctx, tasks.Filter{ChannelIDs: []string{"c"}, ViewerID: "viewer"})
 	require.NoError(t, err)
 	assert.Empty(t, listed)
 	assert.ErrorIs(t, s.Delete(ctx, task.ID), ErrNotFound)
@@ -453,4 +459,38 @@ func TestReminderStateIsRemovedWithItsTask(t *testing.T) {
 	var n int
 	require.NoError(t, s.db.QueryRow(`SELECT COUNT(*) FROM rt_tasks_reminder_state`).Scan(&n))
 	assert.Equal(t, 0, n)
+}
+
+func TestListHidesPrivateTasks(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	yes, no := true, false
+
+	shared := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "shared", Private: &no})
+	unset := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "unset"})
+	mine := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "mine", Private: &yes}) // created by "creator"
+	given := mk(t, s, tasks.CreateInput{ChannelID: "c", Title: "given", Private: &yes, Assignees: []string{"ann"}})
+
+	assert.False(t, shared.Private)
+	assert.False(t, unset.Private, "a nil choice stores a shared task")
+	assert.True(t, mine.Private)
+
+	list := func(viewer string, f tasks.Filter) []string {
+		f.ChannelIDs, f.ViewerID = []string{"c"}, viewer
+		got, err := s.List(ctx, f)
+		require.NoError(t, err)
+		return ids(got)
+	}
+
+	assert.ElementsMatch(t, []string{shared.ID, unset.ID, mine.ID, given.ID}, list("creator", tasks.Filter{}))
+	assert.ElementsMatch(t, []string{shared.ID, unset.ID, given.ID}, list("ann", tasks.Filter{}), "an assignee sees the task they were given")
+	assert.ElementsMatch(t, []string{shared.ID, unset.ID}, list("bystander", tasks.Filter{}))
+	assert.Empty(t, list("bystander", tasks.Filter{Query: "mine"}), "search does not match private tasks")
+	assert.Equal(t, []string{given.ID}, list("ann", tasks.Filter{AssigneeID: "ann"}))
+
+	// Privacy can be turned on and off with a patch.
+	updated, err := s.Update(ctx, shared.ID, tasks.Patch{Private: &yes})
+	require.NoError(t, err)
+	assert.True(t, updated.Private)
+	assert.NotContains(t, list("bystander", tasks.Filter{}), shared.ID)
 }

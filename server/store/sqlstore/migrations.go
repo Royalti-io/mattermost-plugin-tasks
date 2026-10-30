@@ -77,6 +77,14 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 3,
+		statements: []string{
+			// Private tasks are visible only to their creator and assignees. Existing
+			// tasks stay visible to the channel.
+			`ALTER TABLE rt_tasks_task ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT FALSE`,
+		},
+	},
 }
 
 // Migrate applies any pending migrations. It is safe to call from several

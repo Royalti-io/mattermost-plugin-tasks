@@ -22,7 +22,12 @@ Access follows channel membership. There is no separate task permission system.
 | Create, edit, move, delete, change a checklist | Permission to post in the channel, and the channel is not archived |
 | List without `channel_id` | Returns tasks only from channels the caller belongs to |
 
-A caller who cannot see a task gets `404`, the same as for a task that does not
+**Private tasks.** A task with `"private": true` is visible only to its creator and
+its assignees, not to the rest of the channel, and not to system admins through this
+API. Everything above still applies on top: you also need access to the channel.
+Private tasks are left out of lists and search, are never sent to the webhook, and the
+Tasks bot does not reply in a source thread for them. Only the creator can change
+`private`. A caller who cannot see a task gets `404`, the same as for a task that does not
 exist, so task ids do not leak. Creating a task in a channel you cannot post to
 returns `403`. Assignees must be members of the task's channel.
 
@@ -51,7 +56,8 @@ Errors are JSON: `{"error": "message"}` with a matching HTTP status
   "external_id": "pa-123",
   "assignees": ["…"],
   "labels": ["finance"],
-  "checklist": [{"id": "…", "text": "pull statements", "done": false, "position": 0}]
+  "checklist": [{"id": "…", "text": "pull statements", "done": false, "position": 0}],
+  "private": false
 }
 ```
 
@@ -89,14 +95,16 @@ curl -X POST "$BASE/tasks" \
 
 Required: `channel_id`, `title`. Optional: `description`, `status` (default `todo`),
 `priority` (default `normal`), `due_at`, `position`, `assignees`, `labels`,
-`checklist` (list of texts), `post_id`, `source` + `external_id`, `notify_thread`.
+`checklist` (list of texts), `post_id`, `source` + `external_id`, `notify_thread`,
+`private`. When `private` is omitted, the caller's "private by default" setting
+applies (off unless they turned it on).
 Unknown fields are rejected with `400`.
 
 - Returns `201` with the task.
 - **Idempotent create.** If you send `source` and `external_id` and a task with
   that pair already exists, the existing task is returned with `200` and nothing
   changes. Retry freely. The pair must be sent together. If the matching task was
-  deleted, you get `409`.
+  deleted, or is private and you cannot see it, you get `409`.
 - `post_id` must be a post in the same channel. With `"notify_thread": true` the
   Tasks bot replies in that post's thread.
 
@@ -121,8 +129,8 @@ Returns `{"tasks": [...]}` ordered by `position`, then age.
 
 - `GET /tasks/{id}`
 - `PATCH /tasks/{id}`: any of `title`, `description`, `status`, `priority`,
-  `due_at` (send `null` to clear), `assignees` and `labels` (each replaces the whole
-  set). Changing `status` moves the task to the end of its new column.
+  `due_at` (send `null` to clear), `private` (creator only, else `403`), `assignees`
+  and `labels` (each replaces the whole set). Changing `status` moves the task to the end of its new column.
 - `DELETE /tasks/{id}`: soft delete, returns `204`. The row is kept and the
   `source`/`external_id` pair stays reserved.
 
@@ -219,9 +227,15 @@ dropped. The queue holds 1,000 events; beyond that events are dropped and logged
 Treat the webhook as a hint to refetch (`GET /tasks/{id}`) if you cannot afford to
 miss one.
 
+### Preferences: `GET /prefs`, `PATCH /prefs`
+
+Per-user settings. `{"private_by_default": true}` makes tasks the caller creates
+private unless the request says otherwise.
+
 ## Slash command
 
-`/task add <title>`, `/task list`, `/task digest on|off|status`, `/task help`.
+`/task add <title>`, `/task list`, `/task digest on|off|status`,
+`/task private on|off|status`, `/task help`.
 
 ## Reminders
 

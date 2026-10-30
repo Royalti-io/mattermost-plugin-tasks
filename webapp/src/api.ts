@@ -82,6 +82,9 @@ export type CreateParams = {
     checklist?: string[];
     post_id?: string;
     notify_thread?: boolean;
+
+    // Omit to use the user's "private by default" setting.
+    private?: boolean;
 };
 
 export type PatchParams = Partial<{
@@ -92,7 +95,10 @@ export type PatchParams = Partial<{
     due_at: number | null;
     assignees: string[];
     labels: string[];
+    private: boolean;
 }>;
+
+export type Prefs = {private_by_default: boolean};
 
 export const api = {
     async listTasks(params: ListParams): Promise<Task[]> {
@@ -107,6 +113,8 @@ export const api = {
     updateChecklistItem: (taskId: string, itemId: string, patch: {text?: string; done?: boolean}) =>
         request<ChecklistItem>('PATCH', `/tasks/${taskId}/checklist/${itemId}`, patch),
     deleteChecklistItem: (taskId: string, itemId: string) => request<void>('DELETE', `/tasks/${taskId}/checklist/${itemId}`),
+    getPrefs: () => request<Prefs>('GET', '/prefs'),
+    updatePrefs: (patch: Partial<Prefs>) => request<Prefs>('PATCH', '/prefs', patch),
 };
 
 // The slice of a Mattermost user the picker needs.

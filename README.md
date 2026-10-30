@@ -22,6 +22,11 @@ plugin's own tables in your Mattermost Postgres database.
 Access follows channels: you can see a task if you can read its channel, and change
 it if you can post there. Private channels stay private.
 
+**Private tasks.** Tick *Private* when you create a task (or later, in the task's
+details) and only you and the people you assign can see it, even in a busy channel.
+`/task private on` makes your new tasks private by default. Existing tasks stay
+shared until their creator marks them private.
+
 ## Screenshots
 
 ![The Tasks panel in the right-hand sidebar](docs/screenshots/panel.png)

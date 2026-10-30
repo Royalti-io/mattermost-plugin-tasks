@@ -29,6 +29,9 @@ func (p *Plugin) initRouter() *mux.Router {
 	apiRouter.HandleFunc("/ping", p.Ping).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/access", p.Access).Methods(http.MethodGet)
 
+	apiRouter.HandleFunc("/prefs", p.GetPrefs).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/prefs", p.UpdatePrefs).Methods(http.MethodPatch)
+
 	apiRouter.HandleFunc("/tasks", p.ListTasks).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/tasks", p.CreateTask).Methods(http.MethodPost)
 	apiRouter.HandleFunc("/tasks/{id}", p.GetTask).Methods(http.MethodGet)

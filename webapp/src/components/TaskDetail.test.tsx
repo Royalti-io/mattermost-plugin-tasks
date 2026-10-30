@@ -48,6 +48,7 @@ const task: Task = {
     assignees: ['u1'],
     labels: [],
     checklist: [],
+    private: false,
 };
 
 function setup() {

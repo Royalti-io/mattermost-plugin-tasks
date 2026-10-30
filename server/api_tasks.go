@@ -70,8 +70,9 @@ func (p *Plugin) canWrite(userID, channelID string) bool {
 	return err == nil && ch.DeleteAt == 0
 }
 
-// loadTask returns the task if the caller may see it. Callers who cannot see it
-// get the same 404 as a missing task so task ids do not leak across channels.
+// loadTask returns the task if the caller may see it: they can read its channel
+// and, for a private task, created it or are assigned to it. Callers who cannot
+// see it get the same 404 as a missing task so task ids do not leak.
 func (p *Plugin) loadTask(w http.ResponseWriter, r *http.Request, write bool) (*tasks.Task, bool) {
 	id := mux.Vars(r)["id"]
 	if !model.IsValidId(id) {
@@ -83,7 +84,7 @@ func (p *Plugin) loadTask(w http.ResponseWriter, r *http.Request, write bool) (*
 		p.storeError(w, r, err)
 		return nil, false
 	}
-	if !p.canRead(callerID(r), t.ChannelID) {
+	if !p.canRead(callerID(r), t.ChannelID) || !t.CanSee(callerID(r)) {
 		writeError(w, http.StatusNotFound, "not found")
 		return nil, false
 	}
@@ -135,6 +136,15 @@ func (p *Plugin) CreateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if in.Private == nil {
+		prefs, perr := p.getPrefs(callerID(r))
+		if perr != nil {
+			p.storeError(w, r, perr)
+			return
+		}
+		in.Private = &prefs.PrivateByDefault
+	}
+
 	t, created, err := p.tasks.Create(r.Context(), in, callerID(r))
 	if err != nil {
 		p.storeError(w, r, err)
@@ -143,10 +153,15 @@ func (p *Plugin) CreateTask(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusCreated
 	if created {
 		p.emit("created", callerID(r), t)
-		if in.NotifyThread && in.PostID != "" {
+		// The thread reply quotes the title in the channel, which a private task must not.
+		if in.NotifyThread && in.PostID != "" && !t.Private {
 			p.replyTaskCreated(r, in.PostID, t)
 		}
 	} else {
+		if !t.CanSee(callerID(r)) {
+			writeError(w, http.StatusConflict, "a task with this source and external_id already exists")
+			return
+		}
 		status = http.StatusOK
 	}
 	writeJSON(w, status, t)
@@ -173,6 +188,10 @@ func (p *Plugin) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if patch.Private != nil && *patch.Private != t.Private && t.CreatedBy != callerID(r) {
+		writeError(w, http.StatusForbidden, "only the creator can change whether a task is private")
+		return
+	}
 	if patch.Assignees != nil {
 		if err = p.checkAssignees(t.ChannelID, *patch.Assignees); err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -185,6 +204,11 @@ func (p *Plugin) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.emit("updated", callerID(r), updated)
+	if t.Private != updated.Private || (updated.Private && !sameSet(t.Assignees, updated.Assignees)) {
+		// People who just gained or lost sight of the task are not among its
+		// private recipients, so ask the whole channel to refetch.
+		p.publishChannelRefresh("updated", updated.ChannelID, updated.ID)
+	}
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -240,6 +264,7 @@ func (p *Plugin) ListTasks(w http.ResponseWriter, r *http.Request) {
 	uid := callerID(r)
 
 	f := tasks.Filter{
+		ViewerID: uid,
 		Priority: q.Get("priority"),
 		Label:    q.Get("label"),
 		Query:    strings.TrimSpace(q.Get("q")),
@@ -337,7 +362,7 @@ func (p *Plugin) AddChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.emitByID("updated", callerID(r), t.ChannelID, t.ID)
+	p.emitByID("updated", callerID(r), t)
 	writeJSON(w, http.StatusCreated, item)
 }
 
@@ -364,7 +389,7 @@ func (p *Plugin) UpdateChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.emitByID("updated", callerID(r), t.ChannelID, t.ID)
+	p.emitByID("updated", callerID(r), t)
 	writeJSON(w, http.StatusOK, item)
 }
 
@@ -377,7 +402,7 @@ func (p *Plugin) DeleteChecklistItem(w http.ResponseWriter, r *http.Request) {
 		p.storeError(w, r, err)
 		return
 	}
-	p.emitByID("updated", callerID(r), t.ChannelID, t.ID)
+	p.emitByID("updated", callerID(r), t)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -433,4 +458,21 @@ func (p *Plugin) RunReminders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, runRemindersResponse{Reminders: reminders, Digests: digests})
+}
+
+// sameSet reports whether two id lists hold the same ids, ignoring order.
+func sameSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]bool, len(a))
+	for _, id := range a {
+		seen[id] = true
+	}
+	for _, id := range b {
+		if !seen[id] {
+			return false
+		}
+	}
+	return true
 }

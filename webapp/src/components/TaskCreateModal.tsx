@@ -101,6 +101,11 @@ function ModalBody({prefill}: {prefill: Prefill}) {
     const [due, setDue] = useState('');
     const [assignees, setAssignees] = useState<string[]>([currentUserId]);
     const [notify, setNotify] = useState(true);
+
+    // The checkbox starts from the user's saved default. Until they touch it nothing
+    // is sent, so the server applies that default itself.
+    const [privateByDefault, setPrivateByDefault] = useState(false);
+    const [privateChoice, setPrivateChoice] = useState<boolean | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -117,6 +122,22 @@ function ModalBody({prefill}: {prefill: Prefill}) {
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        api.getPrefs().then((prefs) => {
+            if (!cancelled) {
+                setPrivateByDefault(prefs.private_by_default);
+            }
+        }).catch(() => {
+            // Keep the shared default; the server applies the real one on submit.
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const isPrivate = privateChoice ?? privateByDefault;
 
     const changeChannel = (id: string) => {
         setChannelId(id);
@@ -141,6 +162,7 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                 priority,
                 due_at: dateInputToDueAt(due),
                 assignees,
+                ...(privateChoice === null ? {} : {private: privateChoice}),
                 ...(fromPost ? {post_id: prefill.postId, notify_thread: notify} : {}),
             });
             notifyTasksChanged();
@@ -246,7 +268,15 @@ function ModalBody({prefill}: {prefill: Prefill}) {
                         onChange={setAssignees}
                     />
                 </div>
-                {fromPost ? (
+                <label className='rt-inline'>
+                    <input
+                        type='checkbox'
+                        checked={isPrivate}
+                        onChange={(e) => setPrivateChoice(e.target.checked)}
+                    />
+                    {'Private: only you and the people assigned can see it'}
+                </label>
+                {fromPost && !isPrivate ? (
                     <label className='rt-inline'>
                         <input
                             type='checkbox'

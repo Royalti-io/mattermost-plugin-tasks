@@ -348,6 +348,7 @@ func (p *Plugin) buildDigest(ctx context.Context, userID string, local time.Time
 	horizon := local.Add(digestHorizon).UnixMilli()
 	list, err := p.tasks.List(ctx, tasks.Filter{
 		ChannelIDs: channelIDs,
+		ViewerID:   userID,
 		AssigneeID: userID,
 		Statuses:   []string{tasks.StatusBacklog, tasks.StatusTodo, tasks.StatusInProgress, tasks.StatusBlocked},
 		DueBefore:  &horizon,

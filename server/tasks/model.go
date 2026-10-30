@@ -73,6 +73,19 @@ type Task struct {
 	Assignees   []string        `json:"assignees"`
 	Labels      []string        `json:"labels"`
 	Checklist   []ChecklistItem `json:"checklist"`
+
+	// Private hides the task from everyone but its creator and assignees, even
+	// from other members of the channel.
+	Private bool `json:"private"`
+}
+
+// CanSee reports whether a user, already known to be able to read the task's
+// channel, may see the task itself.
+func (t *Task) CanSee(userID string) bool {
+	if !t.Private || t.CreatedBy == userID {
+		return true
+	}
+	return contains(t.Assignees, userID)
 }
 
 // CreateInput is what a caller supplies to create a task.
@@ -90,6 +103,10 @@ type CreateInput struct {
 	PostID      string   `json:"post_id"`
 	Source      string   `json:"source"`
 	ExternalID  string   `json:"external_id"`
+
+	// Private is nil when the caller did not choose; the plugin then applies the
+	// creator's "private by default" preference.
+	Private *bool `json:"private"`
 
 	// NotifyThread asks the plugin to reply in the source post's thread (needs PostID).
 	NotifyThread bool `json:"notify_thread"`
@@ -125,12 +142,17 @@ type Patch struct {
 	DueAt       OptionalInt64 `json:"due_at"`
 	Assignees   *[]string     `json:"assignees"`
 	Labels      *[]string     `json:"labels"`
+	// Private can only be changed by the task's creator.
+	Private *bool `json:"private"`
 }
 
-// Filter selects tasks. ChannelIDs is mandatory: callers must scope every list
-// to channels the requester can read.
+// Filter selects tasks. ChannelIDs and ViewerID are mandatory: callers must scope
+// every list to channels the requester can read and say who is asking.
 type Filter struct {
 	ChannelIDs []string
+	// ViewerID is mandatory: private tasks are returned only if the viewer
+	// created them or is assigned to them. An empty ViewerID matches nothing.
+	ViewerID   string
 	AssigneeID string
 	Statuses   []string
 	Priority   string

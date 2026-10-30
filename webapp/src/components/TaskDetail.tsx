@@ -147,6 +147,16 @@ export default function TaskDetail({task, currentUserId, replace, reload, onErro
                     />
                 </label>
             </div>
+            {task.created_by === currentUserId ? (
+                <label className='rt-inline'>
+                    <input
+                        type='checkbox'
+                        checked={task.private}
+                        onChange={(e) => patch({private: e.target.checked})}
+                    />
+                    {'Private: only you and the people assigned can see it'}
+                </label>
+            ) : null}
             <div className='rt-field'>
                 {'Assignees'}
                 <AssigneePicker

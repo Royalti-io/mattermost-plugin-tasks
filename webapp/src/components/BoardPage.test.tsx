@@ -60,6 +60,7 @@ const task = (id: string, over: Partial<Task> = {}): Task => ({
     assignees: [],
     labels: [],
     checklist: [],
+    private: false,
     ...over,
 });
 

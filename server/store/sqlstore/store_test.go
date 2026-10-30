@@ -106,9 +106,8 @@ func TestMigrateIsIdempotentAndConcurrencySafe(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errs := make(chan error, 4)
-	for i := 0; i < 4; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); errs <- s.Migrate(ctx) }()
+	for range 4 {
+		wg.Go(func() { ; errs <- s.Migrate(ctx) })
 	}
 	wg.Wait()
 	close(errs)
@@ -186,16 +185,14 @@ func TestCreateConcurrentSameExternalIDYieldsOneTask(t *testing.T) {
 
 	var wg sync.WaitGroup
 	var createdCount atomic.Int64
-	for i := 0; i < 6; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 6 {
+		wg.Go(func() {
 			_, created, cerr := s.Create(context.Background(), in, "bot")
 			assert.NoError(t, cerr)
 			if created {
 				createdCount.Add(1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	assert.Equal(t, int64(1), createdCount.Load())
@@ -420,14 +417,12 @@ func TestReminderClaimsAreExactlyOnceAndRearmOnNewDueDate(t *testing.T) {
 	other := ReminderCandidate{TaskID: task.ID, UserID: "bob", Kind: KindDueSoon, DueAt: due}
 	var wg sync.WaitGroup
 	var winners atomic.Int64
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 8 {
+		wg.Go(func() {
 			if won, cerr := s.ClaimReminder(ctx, other); cerr == nil && won {
 				winners.Add(1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	assert.Equal(t, int64(1), winners.Load())

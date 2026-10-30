@@ -180,7 +180,7 @@ func TestWebhookEnqueueNeverBlocksWhenFull(t *testing.T) {
 
 	start := time.Now()
 	accepted := 0
-	for i := 0; i < webhookQueueSize+50; i++ {
+	for range webhookQueueSize + 50 {
 		if w.Enqueue("d", "task.updated", []byte(`{}`)) {
 			accepted++
 		}
@@ -192,8 +192,10 @@ func TestWebhookEnqueueNeverBlocksWhenFull(t *testing.T) {
 
 func TestBuildEvent(t *testing.T) {
 	due := int64(1_900_000_000_000)
-	task := &tasks.Task{ID: "t1", ChannelID: "c1", Title: "Ship", Status: tasks.StatusTodo, DueAt: &due,
-		Assignees: []string{"u1"}, Labels: []string{"x"}, Checklist: []tasks.ChecklistItem{}, Source: "pa", ExternalID: "42"}
+	task := &tasks.Task{
+		ID: "t1", ChannelID: "c1", Title: "Ship", Status: tasks.StatusTodo, DueAt: &due,
+		Assignees: []string{"u1"}, Labels: []string{"x"}, Checklist: []tasks.ChecklistItem{}, Source: "pa", ExternalID: "42",
+	}
 
 	id, eventType, body, err := buildEvent("moved", eventActor{ID: "u9", Username: "agent", IsBot: true}, task)
 	require.NoError(t, err)

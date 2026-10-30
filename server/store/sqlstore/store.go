@@ -188,12 +188,27 @@ func endOfColumn(ctx context.Context, tx *sql.Tx, channelID, status string) (flo
 	return maxPos.Float64 + 1000, nil
 }
 
-func replaceSet(ctx context.Context, tx *sql.Tx, table, col, taskID string, vals []string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE task_id = $1`, taskID); err != nil {
+// setTable holds the fixed statements for a child table with one value per
+// task, so no table or column name is ever built from a variable.
+type setTable struct{ clear, add string }
+
+var (
+	assigneeSet = setTable{
+		clear: `DELETE FROM rt_tasks_assignee WHERE task_id = $1`,
+		add:   `INSERT INTO rt_tasks_assignee (task_id, user_id) VALUES ($1, $2)`,
+	}
+	labelSet = setTable{
+		clear: `DELETE FROM rt_tasks_label WHERE task_id = $1`,
+		add:   `INSERT INTO rt_tasks_label (task_id, label) VALUES ($1, $2)`,
+	}
+)
+
+func replaceSet(ctx context.Context, tx *sql.Tx, set setTable, taskID string, vals []string) error {
+	if _, err := tx.ExecContext(ctx, set.clear, taskID); err != nil {
 		return err
 	}
 	for _, v := range vals {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO `+table+` (task_id, `+col+`) VALUES ($1, $2)`, taskID, v); err != nil {
+		if _, err := tx.ExecContext(ctx, set.add, taskID, v); err != nil {
 			return err
 		}
 	}
@@ -247,10 +262,10 @@ func (s *Store) Create(ctx context.Context, in tasks.CreateInput, createdBy stri
 		}
 
 		created = true
-		if err = replaceSet(ctx, tx, "rt_tasks_assignee", "user_id", id, in.Assignees); err != nil {
+		if err = replaceSet(ctx, tx, assigneeSet, id, in.Assignees); err != nil {
 			return err
 		}
-		if err = replaceSet(ctx, tx, "rt_tasks_label", "label", id, in.Labels); err != nil {
+		if err = replaceSet(ctx, tx, labelSet, id, in.Labels); err != nil {
 			return err
 		}
 		for i, text := range in.Checklist {
@@ -317,12 +332,12 @@ func (s *Store) Update(ctx context.Context, id string, p tasks.Patch) (*tasks.Ta
 			return err
 		}
 		if p.Assignees != nil {
-			if err = replaceSet(ctx, tx, "rt_tasks_assignee", "user_id", id, *p.Assignees); err != nil {
+			if err = replaceSet(ctx, tx, assigneeSet, id, *p.Assignees); err != nil {
 				return err
 			}
 		}
 		if p.Labels != nil {
-			return replaceSet(ctx, tx, "rt_tasks_label", "label", id, *p.Labels)
+			return replaceSet(ctx, tx, labelSet, id, *p.Labels)
 		}
 		return nil
 	})
@@ -437,10 +452,7 @@ func (s *Store) List(ctx context.Context, f tasks.Filter) ([]*tasks.Task, error)
 	if limit > tasks.MaxLimit {
 		limit = tasks.MaxLimit
 	}
-	offset := f.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(f.Offset, 0)
 	b.write(` ORDER BY position ASC, created_at ASC, id ASC LIMIT ` + b.arg(limit) + ` OFFSET ` + b.arg(offset))
 
 	rows, err := s.db.QueryContext(ctx, b.sb.String(), b.args...)

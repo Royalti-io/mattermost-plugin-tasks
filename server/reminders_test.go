@@ -49,18 +49,20 @@ func TestUserLocation(t *testing.T) {
 	assert.Equal(t, time.UTC, userLocation(bad), "an unknown zone falls back to UTC")
 }
 
-func ptr(v int64) *int64 { return &v }
-
 func TestClassifyDigest(t *testing.T) {
 	loc := time.FixedZone("x", 3600)
 	now := time.Date(2026, 10, 29, 9, 0, 0, 0, loc)
 	endToday := time.Date(2026, 10, 29, 23, 59, 59, 0, loc).UnixMilli()
 
-	late := &tasks.Task{ID: "late", Status: tasks.StatusTodo, DueAt: ptr(now.Add(-48 * time.Hour).UnixMilli())}
-	earlier := &tasks.Task{ID: "earlier", Status: tasks.StatusBlocked, DueAt: ptr(now.Add(-72 * time.Hour).UnixMilli())}
-	todayT := &tasks.Task{ID: "today", Status: tasks.StatusTodo, DueAt: ptr(endToday)}
-	tomorrow := &tasks.Task{ID: "tomorrow", Status: tasks.StatusTodo, DueAt: ptr(endToday + 1000)}
-	done := &tasks.Task{ID: "done", Status: tasks.StatusDone, DueAt: ptr(endToday)}
+	lateDue := now.Add(-48 * time.Hour).UnixMilli()
+	earlierDue := now.Add(-72 * time.Hour).UnixMilli()
+	tomorrowDue := endToday + 1000
+
+	late := &tasks.Task{ID: "late", Status: tasks.StatusTodo, DueAt: &lateDue}
+	earlier := &tasks.Task{ID: "earlier", Status: tasks.StatusBlocked, DueAt: &earlierDue}
+	todayT := &tasks.Task{ID: "today", Status: tasks.StatusTodo, DueAt: &endToday}
+	tomorrow := &tasks.Task{ID: "tomorrow", Status: tasks.StatusTodo, DueAt: &tomorrowDue}
+	done := &tasks.Task{ID: "done", Status: tasks.StatusDone, DueAt: &endToday}
 	undated := &tasks.Task{ID: "undated", Status: tasks.StatusTodo}
 
 	overdue, today, week := classifyDigest(now, []*tasks.Task{tomorrow, late, todayT, done, undated, earlier})

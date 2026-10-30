@@ -5,6 +5,7 @@ package tasks
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -173,12 +174,7 @@ func IsStatus(s string) bool   { return contains(Statuses, s) }
 func IsPriority(s string) bool { return contains(Priorities, s) }
 
 func contains(list []string, v string) bool {
-	for _, x := range list {
-		if x == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, v)
 }
 
 func validateTitle(s string) (string, error) {

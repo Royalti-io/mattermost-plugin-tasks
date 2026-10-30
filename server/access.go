@@ -17,7 +17,7 @@ func uiAllowed(allowlist, username string) bool {
 		return true
 	}
 
-	for _, entry := range strings.Split(allowlist, ",") {
+	for entry := range strings.SplitSeq(allowlist, ",") {
 		if strings.ToLower(strings.TrimSpace(entry)) == username {
 			return true
 		}

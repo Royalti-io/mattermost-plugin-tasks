@@ -274,7 +274,7 @@ func (p *Plugin) ListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s := q.Get("status"); s != "" {
-		for _, st := range strings.Split(s, ",") {
+		for st := range strings.SplitSeq(s, ",") {
 			if !tasks.IsStatus(st) {
 				writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid status %q", st))
 				return

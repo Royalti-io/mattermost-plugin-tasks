@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-30
 
 - Private tasks. Tick *Private* when creating a task, or later in its details, and only you and the people assigned can see it, even in a shared channel. `/task private on` makes your new tasks private by default. Existing tasks stay shared until their creator marks them private.
 - Private tasks are left out of lists, search and the board for everyone else, are never sent to the webhook, and the Tasks bot does not reply in the source thread for them.

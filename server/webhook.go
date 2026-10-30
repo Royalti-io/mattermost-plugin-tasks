@@ -111,7 +111,7 @@ func (w *webhookSender) run() {
 }
 
 func (w *webhookSender) deliver(d webhookDelivery) {
-	for attempt := 0; attempt < webhookAttempts; attempt++ {
+	for attempt := range webhookAttempts {
 		if attempt > 0 {
 			wait := w.backoff[min(attempt-1, len(w.backoff)-1)]
 			select {

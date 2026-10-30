@@ -128,7 +128,7 @@ func TestAgentBotWorkflow(t *testing.T) {
 		time.Sleep(2 * time.Second) // let the plugin pick up the new settings
 
 		start := time.Now()
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			require.Equal(t, http.StatusCreated, call(t, th, bc, http.MethodPost, "/tasks", map[string]any{"channel_id": chID, "title": "with dead webhook"}, nil))
 		}
 		assert.Less(t, time.Since(start), 5*time.Second, "delivery is asynchronous")
